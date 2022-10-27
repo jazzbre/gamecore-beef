@@ -1,4 +1,4 @@
-using Dedkeni;
+using GameCore;
 
 namespace System
 {

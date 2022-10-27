@@ -1,6 +1,6 @@
 using System;
 using System.Collections;
-using Dedkeni;
+using GameCore;
 
 namespace ImGui
 {
@@ -62,7 +62,7 @@ namespace ImGui
 			return false;
 		}
 
-		public static bool InputColor(StringView name, ref Dedkeni.Color v)
+		public static bool InputColor(StringView name, ref GameCore.Color v)
 		{
 			var f = float[4](v.r, v.g, v.b, v.a);
 			if (ImGui.ColorEdit4(name.Ptr, f, .HDR))
@@ -198,7 +198,7 @@ namespace ImGui
 			return InputFloat4(name, ref v);
 		}
 
-		public static bool InputProperty(StringView name, ref Dedkeni.Color v)
+		public static bool InputProperty(StringView name, ref GameCore.Color v)
 		{
 			return InputColor(name, ref v);
 		}
@@ -303,8 +303,8 @@ namespace ImGui
 						return true;
 					}
 					break;
-				case typeof(Dedkeni.Color):
-					var v = ((Dedkeni.Color*)data);
+				case typeof(GameCore.Color):
+					var v = ((GameCore.Color*)data);
 					if (InputProperty(name, ref *v))
 					{
 						return true;

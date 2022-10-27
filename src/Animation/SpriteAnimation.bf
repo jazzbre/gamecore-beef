@@ -1,7 +1,7 @@
 using System;
 using System.Collections;
 
-namespace Dedkeni
+namespace GameCore
 {
 	[Flags]
 	enum SpriteAnimationFlags

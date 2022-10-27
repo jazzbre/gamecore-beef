@@ -4,12 +4,12 @@ namespace Chipmunk2D
 {
 	extension Vector2
 	{
-		public Dedkeni.Vector2 ToVector()
+		public GameCore.Vector2 ToVector()
 		{
 			return .((float)x, (float)y);
 		}
 
-		public static Vector2 FromVector(Dedkeni.Vector2 v)
+		public static Vector2 FromVector(GameCore.Vector2 v)
 		{
 			return .((Chipmunk2D.Real)v.x, (Chipmunk2D.Real)v.y);
 		}

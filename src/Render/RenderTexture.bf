@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using Bgfx;
 
-namespace Dedkeni
+namespace GameCore
 {
 	class RenderTexture
 	{

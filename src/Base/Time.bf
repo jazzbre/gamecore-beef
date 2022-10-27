@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using SDL2;
 
-namespace Dedkeni
+namespace GameCore
 {
 	public static class Time
 	{

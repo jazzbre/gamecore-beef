@@ -1,6 +1,6 @@
 using System;
 
-namespace Dedkeni
+namespace GameCore
 {
 	[CRepr, AlwaysInclude(AssumeInstantiated = true, IncludeAllMethods = true), Reflect]
 	public struct Quaternion : IHashable, IEquatable<Quaternion>

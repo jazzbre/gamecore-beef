@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using SoLoud;
 
-namespace Dedkeni
+namespace GameCore
 {
 	enum AudioBus
 	{

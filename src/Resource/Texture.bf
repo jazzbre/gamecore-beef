@@ -4,7 +4,7 @@ using System.IO;
 using System.Diagnostics;
 using Bgfx;
 
-namespace Dedkeni
+namespace GameCore
 {
 	[AlwaysInclude(AssumeInstantiated = true, IncludeAllMethods = true), Reflect]
 	public class Sprite

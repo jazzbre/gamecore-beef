@@ -1,7 +1,7 @@
 using System;
 using SDL2;
 
-namespace Dedkeni
+namespace GameCore
 {
 	public enum LogType
 	{

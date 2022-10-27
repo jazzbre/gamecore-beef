@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Collections;
 
-namespace Dedkeni
+namespace GameCore
 {
 	[AlwaysInclude(AssumeInstantiated = true, IncludeAllMethods = true), Reflect]
 	class ResourceList

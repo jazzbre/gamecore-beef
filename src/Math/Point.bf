@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using System.Text;
 
-namespace Dedkeni
+namespace GameCore
 {
 	[CRepr, AlwaysInclude(AssumeInstantiated = true, IncludeAllMethods = true), Reflect]
 	public struct Point

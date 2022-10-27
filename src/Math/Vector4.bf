@@ -3,7 +3,7 @@ using System.Collections;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Dedkeni
+namespace GameCore
 {
 	[CRepr, AlwaysInclude(AssumeInstantiated = true, IncludeAllMethods = true), Reflect]
 	public struct Vector4 : IHashable, IEquatable<Vector4>

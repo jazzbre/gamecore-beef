@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using System.IO;
 
-namespace Dedkeni
+namespace GameCore
 {
 	[Reflect(.Methods), AlwaysInclude(AssumeInstantiated = true, IncludeAllMethods = true)]
 	public class AudioClipBuilder : ResourceBuilder

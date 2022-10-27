@@ -4,7 +4,7 @@ using System.Collections;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Dedkeni
+namespace GameCore
 {
 	[CRepr, Union]
 	public struct Matrix4

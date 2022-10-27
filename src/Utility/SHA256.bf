@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace Dedkeni
+namespace GameCore
 {
 	struct SHA256Hash
 	{

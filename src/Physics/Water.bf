@@ -1,6 +1,6 @@
 using System;
 
-namespace Dedkeni
+namespace GameCore
 {
 	class Water
 	{

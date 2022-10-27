@@ -6,7 +6,7 @@ using System.Threading;
 using Bgfx;
 using jazzutils;
 
-namespace Dedkeni
+namespace GameCore
 {
 	public static class ResourceManager
 	{

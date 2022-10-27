@@ -1,4 +1,4 @@
-namespace Dedkeni
+namespace GameCore
 {
 	class Curve
 	{

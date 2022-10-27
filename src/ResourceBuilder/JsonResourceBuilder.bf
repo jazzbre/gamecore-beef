@@ -1,6 +1,6 @@
 using System;
 
-namespace Dedkeni
+namespace GameCore
 {
 	[Reflect(.Methods), AlwaysInclude(AssumeInstantiated = true, IncludeAllMethods = true)]
 	class JsonResourceBuilder : ResourceBuilder

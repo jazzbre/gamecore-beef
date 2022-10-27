@@ -3,7 +3,7 @@ using System.IO;
 using System.Collections;
 using Bgfx;
 
-namespace Dedkeni
+namespace GameCore
 {
 	[Reflect(.Methods), AlwaysInclude(AssumeInstantiated = true, IncludeAllMethods = true)]
 	public class ShaderBuilder : ResourceBuilder

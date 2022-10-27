@@ -4,7 +4,7 @@ using System.IO;
 using System.Diagnostics;
 using Bgfx;
 
-namespace Dedkeni
+namespace GameCore
 {
 	class VertexLayoutReader
 	{

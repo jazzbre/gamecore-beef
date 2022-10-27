@@ -1,7 +1,7 @@
 using System;
 using Bgfx;
 
-namespace Dedkeni
+namespace GameCore
 {
 	class CRTRenderer
 	{
