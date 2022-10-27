@@ -51,6 +51,10 @@ namespace GameCore
 
 		void GenerateConvexHull(uint8* image, int width, int height, int stride, Sprite sprite)
 		{
+			if (width <= 1 || height <= 1)
+			{
+				return;
+			}
 			var points = scope List<Chipmunk2D.Vector2>();
 			var pointsHashSet = scope HashSet<int>();
 			double centerX = 0;
