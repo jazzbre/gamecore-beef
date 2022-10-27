@@ -1,0 +1,35 @@
+FileVersion = 1
+Dependencies = {corlib = "*", bgfx-beef = "*", Chipmunk2D-beef = "*", imguibgfx-beef = "*", jazzutils-beef = "*", JSON_Beef = "*", minicoro-beef = "*", nativefiledialog-beef = "*", ozz-animation-beef = "*", soloud-beef = "*"}
+
+[Project]
+Name = "gamecore-beef"
+
+[Configs.Debug.Win64]
+PreprocessorMacros = ["DEBUG", "RESOURCEBUILD"]
+
+[Configs.Debug.Win32]
+PreprocessorMacros = ["DEBUG", "RESOURCEBUILD"]
+
+[Configs.Debug.macOS]
+PreprocessorMacros = ["DEBUG", "RESOURCEBUILD"]
+
+[Configs.Debug.Linux64]
+PreprocessorMacros = ["DEBUG", "RESOURCEBUILD"]
+
+[Configs.Release.Win32]
+PreprocessorMacros = ["RELEASE", "RESOURCEBUILD"]
+
+[Configs.Release.Win64]
+PreprocessorMacros = ["RELEASE", "RESOURCEBUILD"]
+
+[Configs.Paranoid.Win32]
+PreprocessorMacros = ["DEBUG", "PARANOID", "RESOURCEBUILD"]
+
+[Configs.Paranoid.Win64]
+PreprocessorMacros = ["DEBUG", "PARANOID", "RESOURCEBUILD"]
+
+[Configs.Paranoid.macOS]
+PreprocessorMacros = ["RELEASE", "RESOURCEBUILD"]
+
+[Configs.Paranoid.Linux64]
+PreprocessorMacros = ["RELEASE", "RESOURCEBUILD"]

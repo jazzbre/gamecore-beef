@@ -1,0 +1,6 @@
+namespace Dedkeni
+{
+	class JointSkeleton
+	{
+	}
+}

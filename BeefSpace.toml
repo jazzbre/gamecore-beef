@@ -1,0 +1,5 @@
+FileVersion = 1
+Projects = {gamecore = {Path = "."}, bgfx-beef = {Path = "../bgfx-beef"}, Chipmunk2D-beef = {Path = "../Chipmunk2D-beef"}, imguibgfx-beef = {Path = "../imguibgfx-beef"}, jazzutils-beef = {Path = "../jazzutils-beef"}, JSON_Beef = {Path = "../JSON_Beef/lib"}, minicoro-beef = {Path = "../minicoro-beef"}, nativefiledialog-beef = {Path = "../nativefiledialog-beef"}, ozz-animation-beef = {Path = "../ozz-animation-beef"}, sdl2-beef = {Path = "../sdl2-beef"}, soloud-beef = {Path = "../soloud-beef"}}
+
+[Workspace]
+StartupProject = "gamecore-beef"

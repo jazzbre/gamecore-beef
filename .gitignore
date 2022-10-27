@@ -1,0 +1,10 @@
+BeefSpace_User.toml
+build/
+buildtemp/
+recovery/
+imgui.ini
+levelEditorSettings.json
+_*.txt
+runtime/resources/*
+!.gitkeep
+export/
