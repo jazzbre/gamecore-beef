@@ -30,7 +30,7 @@ namespace GameCore
 		bgfx.UniformHandle cfg_e_uniform;
 
 		float curvature, scanlines, shadow_mask, separation, ghosting, noise, flicker, vignette, distortion, aspect_lock,
-			hpos, vpos, hsize, vsize, contrast, brightness, saturation, blur, degauss;// range -1.0f to 1.0f, default=0.0f
+			hpos, vpos, hsize, vsize, contrast, brightness, saturation, blur, degauss; // range -1.0f to 1.0f, default=0.0f
 
 		public this()
 		{
@@ -87,6 +87,19 @@ namespace GameCore
 			blend_shader = ResourceManager.GetResource<Shader>("shaders/crt/crt_blend");
 			copy_shader = ResourceManager.GetResource<Shader>("shaders/crt/crt_copy");
 			accumulate_shader = ResourceManager.GetResource<Shader>("shaders/crt/crt_acc");
+		}
+
+		public ~this()
+		{
+			bgfx.destroy_uniform(blur_uniform);
+			bgfx.destroy_uniform(modulate_uniform);
+			bgfx.destroy_uniform(modulateAndTime_uniform);
+			bgfx.destroy_uniform(resolutionAndUseFrame_uniform);
+			bgfx.destroy_uniform(cfg_a_uniform);
+			bgfx.destroy_uniform(cfg_b_uniform);
+			bgfx.destroy_uniform(cfg_c_uniform);
+			bgfx.destroy_uniform(cfg_d_uniform);
+			bgfx.destroy_uniform(cfg_e_uniform);
 		}
 
 		void RenderBlurCRT(RenderTexture source, RenderTexture target_a, RenderTexture target_b, float r, int width, int height)
@@ -181,7 +194,8 @@ namespace GameCore
 
 			var scale = Math.Min((float)windowWidth / (float)RenderManager.width, (float)windowHeight / (float)RenderManager.height);
 			var snappedScale = Math.Floor(scale);
-			if (Math.Abs(scale - snappedScale) <= 0.20001f) {
+			if (Math.Abs(scale - snappedScale) <= 0.20001f)
+			{
 				scale = snappedScale;
 			}
 			var renderWidth = Math.Floor(RenderManager.width * scale);
