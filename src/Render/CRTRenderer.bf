@@ -113,7 +113,7 @@ namespace GameCore
 				bgfx.set_view_mode(viewId, .Sequential);
 				bgfx.set_view_clear(viewId, 0, 0, 0.0f, 0);
 				bgfx.set_view_rect(viewId, 0, 0, (uint16)width, (uint16)height);
-				bgfx.set_view_name(viewId, "BlurCRT_A");
+				bgfx.set_view_name(viewId, "BlurCRT_A", 8);
 				bgfx.touch(viewId);
 				bgfx.set_uniform(blur_uniform, &blur_vector, 1);
 				vertexbuffer.Render(viewId, .Identity, blur_shader, scope bgfx.TextureHandle[](source.TextureHandle), .White, state, sampler);
@@ -124,7 +124,7 @@ namespace GameCore
 				bgfx.set_view_mode(viewId, .Sequential);
 				bgfx.set_view_clear(viewId, 0, 0, 0.0f, 0);
 				bgfx.set_view_rect(viewId, 0, 0, (uint16)width, (uint16)height);
-				bgfx.set_view_name(viewId, "BlurCRT_B");
+				bgfx.set_view_name(viewId, "BlurCRT_B", 8);
 				bgfx.touch(viewId);
 				bgfx.set_uniform(blur_uniform, &blur_vector, 1);
 				vertexbuffer.Render(viewId, .Identity, blur_shader, scope bgfx.TextureHandle[](target_b.TextureHandle), .White, state, sampler);
@@ -141,7 +141,7 @@ namespace GameCore
 			bgfx.set_view_mode(viewId, .Sequential);
 			bgfx.set_view_clear(viewId, 0, 0, 0.0f, 0);
 			bgfx.set_view_rect(viewId, 0, 0, (uint16)width, (uint16)height);
-			bgfx.set_view_name(viewId, "AccumulateCRT");
+			bgfx.set_view_name(viewId, "AccumulateCRT", 10);
 			bgfx.touch(viewId);
 			bgfx.set_uniform(modulate_uniform, &modulate_vector, 1);
 			vertexbuffer.Render(viewId, .Identity, accumulate_shader, scope bgfx.TextureHandle[](texture0.TextureHandle, texture1.TextureHandle), .White, state, sampler);
@@ -156,7 +156,7 @@ namespace GameCore
 			bgfx.set_view_mode(viewId, .Sequential);
 			bgfx.set_view_clear(viewId, 0, 0, 0.0f, 0);
 			bgfx.set_view_rect(viewId, 0, 0, (uint16)width, (uint16)height);
-			bgfx.set_view_name(viewId, "CopyCRT");
+			bgfx.set_view_name(viewId, "CopyCRT", 5);
 			bgfx.touch(viewId);
 			vertexbuffer.Render(viewId, .Identity, copy_shader, scope bgfx.TextureHandle[](source.TextureHandle), .White, state, sampler);
 		}
@@ -171,7 +171,7 @@ namespace GameCore
 			bgfx.set_view_mode(viewId, .Sequential);
 			bgfx.set_view_clear(viewId, 0, 0, 0.0f, 0);
 			bgfx.set_view_rect(viewId, 0, 0, (uint16)width, (uint16)height);
-			bgfx.set_view_name(viewId, "BlendCRT");
+			bgfx.set_view_name(viewId, "BlendCRT", 8);
 			bgfx.touch(viewId);
 			bgfx.set_uniform(modulate_uniform, &modulate_vector, 1);
 			vertexbuffer.Render(viewId, .Identity, blend_shader, scope bgfx.TextureHandle[](texture0.TextureHandle, texture1.TextureHandle), .White, state, sampler);
@@ -186,20 +186,13 @@ namespace GameCore
 			RenderAccumulateCRT(sourceTexture, blurtexture_a, accumulatetexture_a, width, height, 0.5f);
 			RenderCopyCRT(accumulatetexture_a, accumulatetexture_b, width, height);
 			RenderBlendCRT(sourceTexture, accumulatetexture_b, accumulatetexture_a, width, height, 1.0f);
-			RenderBlurCRT(accumulatetexture_a, accumulatetexture_a, blurtexture_b, 0.17f, width, height);
+			RenderBlurCRT(accumulatetexture_a, accumulatetexture_a, blurtexture_b, 0.05f, width, height);
 			RenderBlurCRT(accumulatetexture_a, blurtexture_a, blurtexture_b, 1.0f, width, height);
 
 			bgfx.StateFlags state = .WriteRgb | .WriteA | .DepthTestAlways;
 			bgfx.SamplerFlags sampler = .UClamp | .VClamp | .Point;
 
-			var scale = Math.Min((float)windowWidth / (float)RenderManager.width, (float)windowHeight / (float)RenderManager.height);
-			var snappedScale = Math.Floor(scale);
-			if (Math.Abs(scale - snappedScale) <= 0.20001f)
-			{
-				scale = snappedScale;
-			}
-			var renderWidth = Math.Floor(RenderManager.width * scale);
-			var renderHeight = Math.Floor(RenderManager.height * scale);
+			var renderOffsetAndSize = GetRenderOffsetAndSize(windowWidth, windowHeight);
 			{
 				uint16 viewId = RenderManager.NextViewId();
 				bgfx.set_view_clear(viewId, (uint)(bgfx.ClearFlags.Color | bgfx.ClearFlags.Depth), 0, 1.0f, 0);
@@ -210,18 +203,14 @@ namespace GameCore
 			uint16 viewId = RenderManager.NextViewId();
 			{
 				bgfx.set_view_clear(viewId, 0, 0, 1.0f, 0);
-				bgfx.set_view_rect(viewId, (uint16)(windowWidth / 2 - renderWidth / 2), (uint16)(windowHeight / 2 - renderHeight / 2), (uint16)renderWidth, (uint16)renderHeight);
+				bgfx.set_view_rect(viewId, (uint16)renderOffsetAndSize.x, (uint16)renderOffsetAndSize.y, (uint16)renderOffsetAndSize.z, (uint16)renderOffsetAndSize.w);
 				bgfx.touch(viewId);
 			}
-			bgfx.set_view_name(viewId, "Present");
+			bgfx.set_view_name(viewId, "Present", 7);
 			Vector4 modulateAndTime_vector = .(1.0f, 1.0f, 1.0f, (float)Time.Time);
-			Vector4 resolutionAndUseFrame_vector = .((float)renderWidth, (float)renderHeight, 0.0f, 0.0f);
+			Vector4 resolutionAndUseFrame_vector = .((float)renderOffsetAndSize.z, (float)renderOffsetAndSize.w, 0.0f, 0.0f);
 			// 4k = (0.75, 6), 1080p = (1.5, 3)
-			float crtScale = 1.0f;
-			if (renderHeight > 1080)
-			{
-				crtScale = 0.5f;
-			}
+			float crtScale = 0.33f;
 			scanlines = 1.5f * crtScale;
 			shadow_mask = 3.0f / crtScale;
 			Vector4 cfg_a_vector = .(curvature, scanlines, shadow_mask, separation);
@@ -237,6 +226,42 @@ namespace GameCore
 			bgfx.set_uniform(cfg_d_uniform, &cfg_d_vector, 1);
 			bgfx.set_uniform(cfg_e_uniform, &cfg_e_vector, 1);
 			screenvertexbuffer.Render(viewId, .Identity, crt_shader, scope bgfx.TextureHandle[](accumulatetexture_a.TextureHandle, blurtexture_a.TextureHandle), .White, state, sampler);
+		}
+
+		public static Vector2 Curve(Vector2 _uv)
+		{
+			var uv = (_uv - Vector2.Half) * 2.0f;
+			uv *= Vector2(1.049f, 1.042f);
+			uv -= Vector2(-0.008f, 0.008f);
+			uv.x *= 1.0f + Math.Pow((Math.Abs(uv.y) / 5.0f), 2.0f);
+			uv.y *= 1.0f + Math.Pow((Math.Abs(uv.x) / 4.0f), 2.0f);
+			uv  = (uv * 0.5f) + Vector2.Half;
+			return uv;
+		}
+
+		public static Vector2 InverseCurve(Vector2 _uv)
+		{
+			var uv = (_uv - Vector2.Half) * 2.0f;
+			// Approximate inverse of the nonlinear transformation
+			uv.y /= 1.0f + Math.Pow(Math.Abs(uv.x) / 4.0f, 2.0f);
+			uv.x /= 1.0f + Math.Pow(Math.Abs(uv.y) / 5.0f, 2.0f);
+			uv += Vector2(-0.008f, 0.008f);
+			uv /= Vector2(1.049f, 1.042f);
+			uv = (uv * 0.5f) + Vector2.Half;
+			return uv;
+		}
+
+		public static Vector4 GetRenderOffsetAndSize(int windowWidth, int windowHeight)
+		{
+			var scale = Math.Min((float)windowWidth / (float)RenderManager.width, (float)windowHeight / (float)RenderManager.height);
+			var snappedScale = Math.Floor(scale);
+			if (Math.Abs(scale - snappedScale) <= 0.20001f)
+			{
+				scale = snappedScale;
+			}
+			Vector2 renderSize = .(Math.Floor(RenderManager.width * scale), Math.Floor(RenderManager.height * scale));
+			Vector2 renderOffset = .((windowWidth / 2 - renderSize.x / 2), (windowHeight / 2 - renderSize.y / 2));
+			return Vector4(renderOffset, renderSize);
 		}
 
 	}

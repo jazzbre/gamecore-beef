@@ -223,6 +223,23 @@ namespace GameCore
 			result.v.m23 = (nearPlaneDistance * farPlaneDistance) / (nearPlaneDistance - farPlaneDistance);
 		}
 
+		public static Matrix4 CreatePerspectiveFOV(float _fovy, float _aspect, float _near, float _far, bool _homogeneousNdc = false)
+		{
+			let height = 1.0f / (float)Math.Tan(_fovy * 0.5f);
+			let width  = height * 1.0f / _aspect;
+			let diff = _far - _near;
+			let aa = _homogeneousNdc ? (     _far + _near) / diff : _far / diff;
+			let bb = _homogeneousNdc ? (2.0f * _far * _near) / diff : _near * aa;
+			var result = Matrix4.Identity;
+			result.d[0] = width;
+			result.d[5] = -height;
+			result.d[8] = 0.0f;
+			result.d[9] =  0.0f;
+			result.d[10] =   aa;
+			result.d[11] =  1.0f;
+			result.d[14] = -bb;
+			return result;
+		}
 
 		public static Matrix4 CreatePerspectiveOffCenter(float left, float right, float bottom, float top, float nearPlaneDistance, float farPlaneDistance)
 		{
@@ -532,7 +549,7 @@ namespace GameCore
 				0, 0, 0, 1);
 		}
 
-		public static Matrix4 operator*(Matrix4 mat1, Matrix4 mat2)
+		public static Matrix4 operator *(Matrix4 mat1, Matrix4 mat2)
 		{
 			return Multiply(mat1, mat2);
 		}

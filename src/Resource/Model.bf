@@ -32,7 +32,8 @@ namespace GameCore
 			{
 				bgfx.set_transform(worldMatrix.Ptr(), 1);
 				bgfx.set_state((uint64)stateFlags, 0);
-				bgfx.set_uniform(RenderManager.timeUniformHandle, &RenderManager.ShaderData.x, 1);
+				var shaderData = RenderManager.ShaderData;
+				bgfx.set_uniform(RenderManager.timeUniformHandle, &shaderData.x, 1);
 				bgfx.set_uniform(RenderManager.colorUniformHandle, &color.x, 1);
 				bgfx.set_uniform(RenderManager.settingsUniformHandle, &settings.x, 1);
 				bgfx.set_vertex_buffer(0, group.m_vbh, 0, (uint32)group.m_numVertices);

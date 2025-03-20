@@ -53,8 +53,8 @@ namespace GameCore
 
 		public static RenderTexture temporaryRenderTextureWithDepth;
 
-		public static int width = 320 * 1 + 320 / 4;
-		public static int height = 180 * 1 + 180 / 4;
+		public static int width = 640; // 320 * 1 + 320 / 4;
+		public static int height = 320; //180 * 1 + 180 / 4;
 		public static float ooWidth, ooHeight;
 		public static var viewBounds = Bounds2();
 
@@ -270,7 +270,7 @@ namespace GameCore
 			var view = Matrix4.Identity;
 			var projection = RenderManager.CreatePerspectiveOrtho(0, (float)width, 0, (float)height, 0.0f, 1.0f, 0.0f);
 			bgfx.set_view_transform(viewId, view.Ptr(), projection.Ptr());
-			bgfx.set_view_name(viewId, "Blit");
+			bgfx.set_view_name(viewId, "Blit", 4);
 			bgfx.touch(viewId);
 			RenderManager.RenderScreenQuad(viewId, shader, sourceTextureHandle, _stateFlags, _samplerFlags, programIndex);
 		}
@@ -287,7 +287,7 @@ namespace GameCore
 			var view = Matrix4.Identity;
 			var projection = RenderManager.CreatePerspectiveOrtho(0, (float)width, 0, (float)height, 0.0f, 1.0f, 0.0f);
 			bgfx.set_view_transform(viewId, view.Ptr(), projection.Ptr());
-			bgfx.set_view_name(viewId, "Blit2");
+			bgfx.set_view_name(viewId, "Blit2", 5);
 			bgfx.touch(viewId);
 			RenderManager.RenderScreenQuad(viewId, shader, textureHandles, _stateFlags, _samplerFlags, programIndex);
 		}

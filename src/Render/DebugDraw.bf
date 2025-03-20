@@ -60,9 +60,9 @@ namespace GameCore
 		public static void DrawAxis(Matrix4 worldMatrix, float size, float radius)
 		{
 			Vector2 position = worldMatrix.Translation.xy;
-			DrawFatSegment(position, Vector3.Transform((worldMatrix.r.RowX * size).xyz, worldMatrix).xy, 1.5f, .(1, 0, 0, 1), .(1, 0, 0, 1));
-			DrawFatSegment(position, Vector3.Transform((worldMatrix.r.RowY * size).xyz, worldMatrix).xy, 1.5f, .(0, 1, 0, 1), .(0, 1, 0, 1));
-			DrawFatSegment(position, Vector3.Transform((worldMatrix.r.RowZ * size).xyz, worldMatrix).xy, 1.5f, .(0, 0, 1, 1), .(0, 0, 1, 1));
+			DrawFatSegment(position, Vector3.Transform((Vector3.UnitX * size), worldMatrix).xy, 1.5f, .(1, 0, 0, 1), .(1, 0, 0, 1));
+			DrawFatSegment(position, Vector3.Transform((Vector3.UnitY * size), worldMatrix).xy, 1.5f, .(0, 1, 0, 1), .(0, 1, 0, 1));
+			DrawFatSegment(position, Vector3.Transform((Vector3.UnitZ * size), worldMatrix).xy, 1.5f, .(0, 0, 1, 1), .(0, 0, 1, 1));
 		}
 
 		public static void DrawBounds(Bounds2 bounds, Color color, Matrix4 matrix = .Identity)

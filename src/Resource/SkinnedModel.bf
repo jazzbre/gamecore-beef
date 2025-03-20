@@ -38,13 +38,13 @@ namespace GameCore
 			if (header.meshSize > 0)
 			{
 				Mesh = new SkinnedMesh();
-				Mesh.Load(binaryFile, header.meshSize);
+				Mesh.Load(binaryFile, (int)header.meshSize);
 			}
 			if (header.animationCount > 0)
 			{
 				Animations = new Dictionary<String, Ozz.Animation>();
 				AnimationList = new List<Ozz.Animation>();
-				for (int i = 0; i < header.animationCount; ++i)
+				for (uint32 i = 0; i < header.animationCount; ++i)
 				{
 					var animationName = new String();
 					SystemUtils.ReadStrSized32(binaryFile, animationName);

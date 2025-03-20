@@ -202,41 +202,45 @@ namespace GameCore
 			return .((float)Math.Cos(angle) * length, (float)Math.Sin(angle) * length);
 		}
 
-		public static Vector2 operator-(Vector2 vec1)
+		public static Vector2 operator -(Vector2 vec1)
 		{
 			return .(-vec1.x, -vec1.y);
 		}
 
-		public static Vector2 operator+(Vector2 vec1, Vector2 vec2)
+		public static Vector2 operator +(Vector2 vec1, Vector2 vec2)
 		{
 			return .(vec1.x + vec2.x, vec1.y + vec2.y);
 		}
 
-		public static Vector2 operator-(Vector2 vec1, Vector2 vec2)
+		public static Vector2 operator -(Vector2 vec1, Vector2 vec2)
 		{
 			return .(vec1.x - vec2.x, vec1.y - vec2.y);
 		}
 
-		public static Vector2 operator*(Vector2 vec1, Vector2 vec2)
+		public static Vector2 operator *(Vector2 vec1, Vector2 vec2)
 		{
 			return .(vec1.x * vec2.x, vec1.y * vec2.y);
 		}
 
-		public static Vector2 operator/(Vector2 vec1, Vector2 vec2)
+		public static Vector2 operator /(Vector2 vec1, Vector2 vec2)
 		{
 			return .(vec1.x / vec2.x, vec1.y / vec2.y);
 		}
 
 		[Commutable]
-		public static Vector2 operator*(Vector2 vec, float scale)
+		public static Vector2 operator *(Vector2 vec, float scale)
 		{
 			return .(vec.x * scale, vec.y * scale);
 		}
 
-		[Commutable]
-		public static Vector2 operator/(Vector2 vec, float scale)
+		public static Vector2 operator /(Vector2 vec, float f)
 		{
-			return .(vec.x / scale, vec.y / scale);
+			return .(vec.x / f, vec.y / f);
+		}
+
+		public static Vector2 operator /(float f, Vector2 vec)
+		{
+			return .(f / vec.x, f / vec.y);
 		}
 
 		public override void ToString(String str)

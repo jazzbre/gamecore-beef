@@ -41,6 +41,7 @@ namespace GameCore
 			{
 				return;
 			}
+			Log.Info($"Loading resource '{Name}...");
 			OnLoad();
 			IsLoaded = true;
 		}

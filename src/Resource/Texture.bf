@@ -196,7 +196,7 @@ namespace GameCore
 			return sprite;
 		}
 
-		public Sprite FindSpriteByPosition(int x, int y)
+		public Sprite FindSpriteByPosition(uint32 x, uint32 y)
 		{
 			for (var pair in textureSpriteMap)
 			{

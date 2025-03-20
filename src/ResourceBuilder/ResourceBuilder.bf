@@ -15,7 +15,7 @@ namespace GameCore
 
 	public abstract class ResourceBuilder
 	{
-		public virtual String[] Extensions => null
+		public virtual String[] Extensions => null;
 
 		public abstract Type ResourceType => null;
 

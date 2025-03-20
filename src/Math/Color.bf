@@ -21,6 +21,8 @@ namespace GameCore
 		public const Color Green = .(0, 1, 0, 1);
 		public const Color Blue = .(0, 0, 1, 1);
 
+		public const float oo255 = 1.0f / 255.0f;
+
 		public this()
 		{
 			this = default;
@@ -40,6 +42,14 @@ namespace GameCore
 			g = v.y;
 			b = v.z;
 			a = v.w;
+		}
+
+		public this(uint32 c)
+		{
+			r = (float)(c & 0xff) * oo255;
+			g = (float)((c >> 8) & 0xff) * oo255;
+			b = (float)((c >> 16) & 0xff) * oo255;
+			a = (float)((c >> 24) & 0xff) * oo255;
 		}
 
 		public Vector4 xyzw
@@ -82,7 +92,7 @@ namespace GameCore
 			return a + (b - a) * delta;
 		}
 
-		public static bool operator==(Color value1, Color value2)
+		public static bool operator ==(Color value1, Color value2)
 		{
 			return (value1.r == value2.r) &&
 				(value1.g == value2.g) &&
@@ -90,43 +100,43 @@ namespace GameCore
 				(value1.a == value2.a);
 		}
 
-		public static bool operator!=(Color value1, Color value2)
+		public static bool operator !=(Color value1, Color value2)
 		{
 			return !(value1 == value2);
 		}
 
-		public static Color operator-(Color vec1)
+		public static Color operator -(Color vec1)
 		{
 			return .(-vec1.r, -vec1.g, -vec1.b, -vec1.a);
 		}
 
-		public static Color operator+(Color vec1, Color vec2)
+		public static Color operator +(Color vec1, Color vec2)
 		{
 			return .(vec1.r + vec2.r, vec1.g + vec2.g, vec1.b + vec2.b, vec1.a + vec2.a);
 		}
 
-		public static Color operator-(Color vec1, Color vec2)
+		public static Color operator -(Color vec1, Color vec2)
 		{
 			return .(vec1.r - vec2.r, vec1.g - vec2.g, vec1.b - vec2.b, vec1.a - vec2.a);
 		}
 
-		public static Color operator*(Color vec1, Color vec2)
+		public static Color operator *(Color vec1, Color vec2)
 		{
 			return .(vec1.r * vec2.r, vec1.g * vec2.g, vec1.b * vec2.b, vec1.a * vec2.a);
 		}
 
-		public static Color operator/(Color vec1, Color vec2)
+		public static Color operator /(Color vec1, Color vec2)
 		{
 			return .(vec1.r / vec2.r, vec1.g / vec2.g, vec1.b / vec2.b, vec1.a / vec2.a);
 		}
 
 		[Commutable]
-		public static Color operator*(Color vec, float scale)
+		public static Color operator *(Color vec, float scale)
 		{
 			return .(vec.r * scale, vec.g * scale, vec.b * scale, vec.a * scale);
 		}
 
-		public static Color operator/(Color vec, float scale)
+		public static Color operator /(Color vec, float scale)
 		{
 			return .(vec.r / scale, vec.g / scale, vec.b / scale, vec.a / scale);
 		}

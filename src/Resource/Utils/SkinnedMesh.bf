@@ -227,9 +227,12 @@ namespace GameCore
 				let part = subMesh.parts[0];
 				bgfx.set_transform(worldMatrix.Ptr(), 1);
 				bgfx.set_state((uint64)stateFlags, 0);
-				bgfx.set_uniform(RenderManager.timeUniformHandle, &RenderManager.ShaderData.x, 1);
-				bgfx.set_uniform(RenderManager.colorUniformHandle, &color.x, 1);
-				bgfx.set_uniform(RenderManager.settingsUniformHandle, &settings.x, 1);
+				var shaderData = RenderManager.ShaderData;
+				bgfx.set_uniform(RenderManager.timeUniformHandle, &shaderData.x, 1);
+				var _color = color;
+				bgfx.set_uniform(RenderManager.colorUniformHandle, &_color.x, 1);
+				var _settings = settings;
+				bgfx.set_uniform(RenderManager.settingsUniformHandle, &_settings.x, 1);
 				bgfx.set_uniform(RenderManager.instanceDataUniformHandle, jointMatrices3x4, (uint16)jointCount * 3);
 				bgfx.set_vertex_buffer(0, part.vertexBufferHandle, 0, (uint32)part.vertexCount);
 				bgfx.set_index_buffer(subMesh.indexBufferHandle, 0, (uint32)subMesh.indicesCount);

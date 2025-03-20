@@ -29,7 +29,7 @@ namespace System
 			{
 				return 0;
 			}
-			let threshold = -((int)bound) % bound;
+			let threshold = (uint32)(-((int)bound) % (int)bound);
 			while (true)
 			{
 				let r = Next();
