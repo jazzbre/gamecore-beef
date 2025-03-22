@@ -15,8 +15,29 @@ namespace ImGui
 
 	extension ImGui
 	{
+		public class IDScope
+		{
+			public this<T>(T v) where T : Object
+			{
+				ImGui.PushID(Internal.UnsafeCastToPtr(v));
+			}
+			public this<T>(ref T v) where T : ValueType
+			{
+				ImGui.PushID(&v);
+			}
+			public this<T>(ref T v) where T : enum
+			{
+				ImGui.PushID(&v);
+			}
+			public ~this()
+			{
+				ImGui.PopID();
+			}
+		}
+
 		public static bool InputText(StringView name, String text)
 		{
+			var idScope = scope IDScope(text);
 			var buffer = scope char8[512];
 			Internal.MemCpy(&buffer[0], text.Ptr, text.Length);
 			buffer[text.Length] = 0;
@@ -31,6 +52,7 @@ namespace ImGui
 
 		public static bool InputFloat2(StringView name, ref Vector2 v)
 		{
+			var idScope = scope IDScope(ref v);
 			var f = float[2](v.x, v.y);
 			if (ImGui.InputFloat2(name.Ptr, f))
 			{
@@ -42,6 +64,7 @@ namespace ImGui
 
 		public static bool InputFloat3(StringView name, ref Vector3 v)
 		{
+			var idScope = scope IDScope(ref v);
 			var f = float[3](v.x, v.y, v.z);
 			if (ImGui.InputFloat3(name.Ptr, f))
 			{
@@ -53,6 +76,7 @@ namespace ImGui
 
 		public static bool InputFloat4(StringView name, ref Vector4 v)
 		{
+			var idScope = scope IDScope(ref v);
 			var f = float[4](v.x, v.y, v.z, v.w);
 			if (ImGui.InputFloat4(name.Ptr, f))
 			{
@@ -64,6 +88,7 @@ namespace ImGui
 
 		public static bool InputColor(StringView name, ref GameCore.Color v)
 		{
+			var idScope = scope IDScope(ref v);
 			var f = float[4](v.r, v.g, v.b, v.a);
 			if (ImGui.ColorEdit4(name.Ptr, f, .HDR))
 			{
@@ -73,8 +98,10 @@ namespace ImGui
 			return false;
 		}
 
-		public static bool InputEnum(StringView name, ref int64 t, Type type)
+		public static bool InputEnum(StringView name, ref int64 v, Type type)
 		{
+			var idScope = scope IDScope(ref v);
+			var originalV = v;
 			var enumInfo = ReflectionUtils.GetEnumInfo(type);
 			if (enumInfo == null || enumInfo.names.Count == 0)
 			{
@@ -85,7 +112,7 @@ namespace ImGui
 				var preview = scope String();
 				for (var i = 0; i < enumInfo.values.Count; ++i)
 				{
-					if ((t & enumInfo.values[i]) != 0)
+					if ((v & enumInfo.values[i]) != 0)
 					{
 						if (preview.Length > 0)
 						{
@@ -103,15 +130,15 @@ namespace ImGui
 				{
 					for (var i = 0; i < enumInfo.values.Count; ++i)
 					{
-						var isSet = (t & enumInfo.values[i]) != 0;
+						var isSet = (v & enumInfo.values[i]) != 0;
 						if (ImGui.Selectable(enumInfo.names[i].Ptr, isSet))
 						{
 							if (isSet)
 							{
-								t &= ~enumInfo.values[i];
+								v &= ~enumInfo.values[i];
 							} else
 							{
-								t |= enumInfo.values[i];
+								v |= enumInfo.values[i];
 							}
 						}
 					}
@@ -122,7 +149,7 @@ namespace ImGui
 				int32 index = 0;
 				for (int i = 0; i < enumInfo.values.Count; ++i)
 				{
-					if (t == enumInfo.values[i])
+					if (v == enumInfo.values[i])
 					{
 						index = (.)i;
 						break;
@@ -130,35 +157,41 @@ namespace ImGui
 				}
 				if (ImGui.Combo(name.Ptr, &index, &enumInfo.namePointers[0], (int32)enumInfo.namePointers.Count))
 				{
-					t = (int64)enumInfo.values[index];
+					v = (int64)enumInfo.values[index];
 				}
 			}
-			return true;
+			return originalV != v;
 		}
 
-		public static bool InputEnum<T>(StringView name, ref T t) where T : enum
+		public static bool InputEnum<T>(StringView name, ref T v) where T : enum
 		{
-			var value = (int64)t;
+			ImGui.PushID(&v);
+			var value = (int64)v;
 			if (InputEnum(name, ref value, typeof(T)))
 			{
-				t = (T)value;
+				v = (T)value;
+				ImGui.PopID();
 				return true;
 			}
-			return true;
+			ImGui.PopID();
+			return false;
 		}
 
 		public static bool InputProperty(StringView name, ref String v)
 		{
+			var idScope = scope IDScope(v);
 			return InputText(name, v);
 		}
 
 		public static bool InputProperty(StringView name, ref bool v)
 		{
+			var idScope = scope IDScope(ref v);
 			return Checkbox(name.Ptr, &v);
 		}
 
 		public static bool InputProperty(StringView name, ref int v)
 		{
+			var idScope = scope IDScope(ref v);
 			var i = (int32)v;
 			if (InputInt(name.Ptr, &i))
 			{
@@ -170,42 +203,51 @@ namespace ImGui
 
 		public static bool InputProperty(StringView name, ref int32 v)
 		{
+			var idScope = scope IDScope(ref v);
 			return InputInt(name.Ptr, &v);
 		}
 
 		public static bool InputProperty(StringView name, ref float v)
 		{
+			var idScope = scope IDScope(ref v);
 			return InputFloat(name.Ptr, &v);
 		}
 
 		public static bool InputProperty(StringView name, ref double v)
 		{
+			var idScope = scope IDScope(ref v);
 			return InputDouble(name.Ptr, &v);
 		}
 
 		public static bool InputProperty(StringView name, ref Vector2 v)
 		{
+			var idScope = scope IDScope(ref v);
 			return InputFloat2(name, ref v);
 		}
 
 		public static bool InputProperty(StringView name, ref Vector3 v)
 		{
+			var idScope = scope IDScope(ref v);
 			return InputFloat3(name, ref v);
 		}
 
 		public static bool InputProperty(StringView name, ref Vector4 v)
 		{
+			var idScope = scope IDScope(ref v);
 			return InputFloat4(name, ref v);
 		}
 
 		public static bool InputProperty(StringView name, ref GameCore.Color v)
 		{
+			var idScope = scope IDScope(ref v);
 			return InputColor(name, ref v);
 		}
 
-		public static bool InputProperty<T>(StringView name, ref T t) where T : enum
+		public static bool InputProperty<T>(StringView name, ref T v) where T : enum
 		{
-			return InputEnum(name, ref t);
+			var idScope = scope IDScope(ref v);
+			var ret = InputEnum(name, ref v);
+			return ret;
 		}
 
 		public static bool InputProperty(StringView name, System.Reflection.FieldInfo field, Type type, void* data)
@@ -548,6 +590,12 @@ namespace ImGui
 					sprite = (Sprite)Internal.UnsafeCastToObject(spritePointer);
 				}
 				ImGui.EndDragDropTarget();
+			}
+			if (sprite != null)
+			{
+				float size = ImGui.GetTextLineHeight();
+				ImGui.SameLine();
+				ImGui.Image(ImGui.BgfxGetTextureId(sprite.texture.Handle.idx, ImGui.BgfxTextureFlags.Opaque | ImGui.BgfxTextureFlags.PointSampler), .(size, size), ImGui.Vec2(sprite.uvBounds.x, sprite.uvBounds.y), ImGui.Vec2(sprite.uvBounds.z, sprite.uvBounds.w));
 			}
 			return lastSprite != sprite;
 		}
