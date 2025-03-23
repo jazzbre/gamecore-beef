@@ -4,10 +4,24 @@ using System.Collections;
 
 namespace GameCore
 {
+	[Reflect]
 	enum AutoTileRuleType
 	{
 		Tile,
 		Prop
+	}
+
+	[Reflect]
+	enum AutoTileFlags
+	{
+		None,
+		NoCollision = 1 << 0,
+		CenterX = 1 << 1,
+		CenterY = 1 << 2,
+		MinX = 1 << 3,
+		MinY = 1 << 4,
+		MaxX = 1 << 5,
+		MaxY = 1 << 6,
 	}
 
 	[AlwaysInclude(AssumeInstantiated = true, IncludeAllMethods = true), Reflect]
@@ -47,9 +61,11 @@ namespace GameCore
 		[JSON_Beef.Serialized]
 		public AutoTileRuleType type = .Tile;
 		[JSON_Beef.Serialized]
-		public bool collision = false;
-		[JSON_Beef.Serialized]
 		public bool enabled = true;
+		[JSON_Beef.Serialized]
+		public AutoTileFlags flags = .None;
+		[JSON_Beef.Serialized]
+		public SpriteFlags spriteFlags = .None;
 		[JSON_Beef.Serialized]
 		public float probability = 1.0f;
 
@@ -58,6 +74,10 @@ namespace GameCore
 			for (var sprite in ruleSprites)
 			{
 				sprite.sprite = Sprite.Find(sprite.spriteName);
+			}
+			if (pattern.Count == 0)
+			{
+				pattern.Count = AutoTileRule.Size * AutoTileRule.Size;
 			}
 		}
 	}
@@ -96,7 +116,7 @@ namespace GameCore
 			}
 		}
 
-		public AutoTileRule Duplicate(AutoTileRule rule)
+		public AutoTileRule Duplicate(AutoTileRule rule, int insert = -1)
 		{
 			String jsonString = null;
 			defer
@@ -117,7 +137,13 @@ namespace GameCore
 			case .Err(let err):
 				delete newRule;
 			}
-			rules.Add(newRule);
+			if (insert != -1)
+			{
+				rules.Insert(Math.Min(insert + 1, rules.Count), newRule);
+			} else
+			{
+				rules.Add(newRule);
+			}
 			return newRule;
 		}
 	}

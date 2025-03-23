@@ -16,6 +16,7 @@ namespace GameCore
 		Dynamic,
 		Water,
 		PickUp,
+		Other,
 	}
 
 	enum CollisionCategory : uint32

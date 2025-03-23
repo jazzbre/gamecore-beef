@@ -11,10 +11,14 @@ namespace GameCore
 		public int spriteIndex;
 	}
 
+	[Reflect, Flags]
 	enum SpriteFlags
 	{
+		None,
 		FlipX = 1 << 0,
 		FlipY = 1 << 1,
+		FlipU = 1 << 2,
+		FlipV = 1 << 3,
 	}
 
 	class SpriteBatchRenderer
@@ -107,6 +111,16 @@ namespace GameCore
 			{
 				pivotWorldMatrix.Up = -pivotWorldMatrix.Up;
 				localPivot.y = -localPivot.y;
+			}
+			if ((flags & .FlipU) != 0)
+			{
+				pivotWorldMatrix.Right = -pivotWorldMatrix.Right;
+				localPivot.x = 1.0f;
+			}
+			if ((flags & .FlipV) != 0)
+			{
+				pivotWorldMatrix.Up = -pivotWorldMatrix.Up;
+				localPivot.y = 1.0f;
 			}
 			var newPosition = Vector3.Transform(Vector3(localPivot.x, localPivot.y, 0.0f) * spriteSize, worldMatrix);
 			newPosition = .Floor(newPosition);

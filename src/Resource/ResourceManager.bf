@@ -34,6 +34,8 @@ namespace GameCore
 		public static Dictionary<Type, List<Resource>> ResourcesByType => resourceByTypeMap;
 
 		private static Monitor buildResourceLock = null ~ delete _;
+		private static List<Resource> queuedResources = new .() ~ delete _;
+		private static Job loadResourcesJob = null;
 
 		#if BF_PLATFORM_WINDOWS
 		const String ToolsPath = "/../bgfx-beef/submodules/bgfx/.build/win64_vs2019/bin/";
@@ -304,7 +306,7 @@ namespace GameCore
 				}
 				BuildResourcesForPlatform(.Last, "");
 				buildResourceLock = new Monitor();
-		#if BF_PLATFORM_WINDOWS				
+		#if BF_PLATFORM_WINDOWS
 				// Watch buildtime folder
 				buildResourcesWatched = new FileSystemWatcher(buildtimeResourcesPath);
 				buildResourcesWatched.IncludeSubdirectories = true;
@@ -368,6 +370,8 @@ namespace GameCore
 				SystemUtils.ShowMessageBoxOK("ERROR", "Runtime folder missing!");
 				System.Environment.Exit(1);
 			}
+
+			loadResourcesJob = JobSystem.CreateJob(new [&] (startIndex, endIndex, workerIndex) => LoadResourcesJobFunction(startIndex, endIndex, workerIndex));
 		}
 
 		public static void Update(bool isPaused)
@@ -411,6 +415,50 @@ namespace GameCore
 				return resource as T;
 			}
 			return null;
+		}
+
+		public static T QueueResourceLoad<T>(StringView path) where T : Resource
+		{
+			var hashString = scope String();
+			GetPathHash(path, hashString);
+			if (resourceMap.TryGetValue(hashString, var resource))
+			{
+				if (!(resource is T))
+				{
+					return null;
+				}
+				queuedResources.Add(resource);
+				return resource as T;
+			}
+			return null;
+		}
+
+		public static void WaitQueuedResources()
+		{
+			if (queuedResources.Count == 0)
+			{
+				return;
+			}
+			Log.Info($"WaitQueuedResources {queuedResources.Count}...");
+#if USEJOBS
+			JobSystem.AddJob(loadResourcesJob, (uint32)queuedResources.Count);
+			JobSystem.WaitJobs(loadResourcesJob);
+#else
+			for (var resource in queuedResources)
+			{
+				resource.Load();
+			}
+#endif
+			queuedResources.Clear();
+			Log.Info($"WaitQueuedResources DONE!");
+		}
+
+		private static void LoadResourcesJobFunction(uint32 startIndex, uint32 endIndex, uint32 workerIndex)
+		{
+			for (uint32 i = startIndex; i < endIndex; ++i)
+			{
+				queuedResources[i].Load();
+			}
 		}
 
 		public static List<Resource> FindResourcesByType<T>() where T : Resource

@@ -20,7 +20,7 @@ namespace GameCore
 			return usedSprites.Contains(sprite);
 		}
 
-		public static AutoTileLayer Duplicate(AutoTileLayer layer)
+		public static AutoTileLayer Duplicate(AutoTileLayer layer, int insert = -1)
 		{
 			AutoTileList list = scope .();
 			list.layers.Add(layer);
@@ -28,7 +28,15 @@ namespace GameCore
 			list.LoadFromJson(json);
 			delete json;
 			var newLayer = list.layers[list.layers.Count - 1];
-			AutoTileLayers.Add(newLayer);
+			newLayer.id = 0;
+			if (insert != -1)
+			{
+				AutoTileLayers.Insert(Math.Min(insert + 1, AutoTileLayers.Count), newLayer);
+			}
+			else
+			{
+				AutoTileLayers.Add(newLayer);
+			}
 			UpdateDictionary();
 			list.layers.Clear();
 			return newLayer;
