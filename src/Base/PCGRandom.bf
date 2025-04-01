@@ -67,7 +67,7 @@ namespace System
 			return (float)NextDouble();
 		}
 
-		public double NextFloatSigned() mut
+		public float NextFloatSigned() mut
 		{
 			return (float)NextDoubleSigned();
 		}

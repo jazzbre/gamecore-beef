@@ -62,5 +62,10 @@ namespace GameCore
 		{
 			return a.min.x < b.max.x && a.min.y < b.max.y && a.max.x >= b.min.x && a.max.y >= b.min.y;
 		}
+
+		public Vector2 GetClosestPoint(Vector2 point)
+		{
+			return .(Math.Max(min.x, Math.Min(point.x, max.x)), Math.Max(min.y, Math.Min(point.y, max.y)));
+		}
 	}
 }

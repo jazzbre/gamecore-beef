@@ -13,12 +13,17 @@ namespace GameCore
 			return Chipmunk2D.DebugColor(0.3f, 0.4f, 0.3f, 0.5f);
 		}
 
+		public static void DrawPolygon(int32 count, Chipmunk2D.Vector2* verts, Chipmunk2D.Real radius, Chipmunk2D.DebugColor outlineColor, Chipmunk2D.DebugColor fillColor, void* data = null)
+		{
+			DebugDraw.DrawPolygon(count, verts, radius, outlineColor, fillColor, data);
+		}
+
 		public void Initialize()
 		{
 			debugDrawOptions.drawCircle = => DebugDraw.DrawCircle;
 			debugDrawOptions.drawSegment = => DebugDraw.DrawSegment;
 			debugDrawOptions.drawFatSegment = => DebugDraw.DrawFatSegment;
-			debugDrawOptions.drawPolygon = => DebugDraw.DrawPolygon;
+			debugDrawOptions.drawPolygon = => DrawPolygon;
 			debugDrawOptions.drawDot = => DebugDraw.DrawDot;
 
 			debugDrawOptions.flags = .Shapes | .Constraints | .DrawCollisionPoints;

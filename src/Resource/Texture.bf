@@ -32,15 +32,32 @@ namespace GameCore
 
 		public static Dictionary<String, Sprite> spriteMap = new Dictionary<String, Sprite>() ~ delete _;
 
-		public Chipmunk2D.Shape CreateShape(Chipmunk2D.Body body, Vector2 offset = .Zero, double radius = 0.0, bool setMoment = true)
+		public Chipmunk2D.Shape CreateShape(Chipmunk2D.Body body, Vector2 offset = .Zero, double radius = 0.0, bool setMoment = true, SpriteFlags spriteFlags = .None)
 		{
 			var verts = scope Chipmunk2D.Vector2[convexHull.Count / 2];
 			var scale = size.xy;
+			let flipU = (spriteFlags & .FlipU) != 0;
+			let flipV = (spriteFlags & .FlipV) != 0;
 			var index = 0;
+			var increment = 1;
+			if (flipU != flipV && (flipU || flipV))
+			{
+				index = convexHull.Count / 2 - 1;
+				increment = -1;
+			}
 			for (int i = 0; i < convexHull.Count; i += 2)
 			{
-				let point = offset + Vector2(convexHull[i + 0], convexHull[i + 1]) * scale;
-				verts[index++] = Chipmunk2D.Vector2.FromVector(point);
+				var point = Vector2(convexHull[i + 0], convexHull[i + 1]);
+				if (flipU)
+				{
+					point.x = 1.0f - point.x;
+				}
+				if (flipV)
+				{
+					point.y = 1.0f - point.y;
+				}
+				verts[index] = Chipmunk2D.Vector2.FromVector(offset + point * scale);
+				index += increment;
 			}
 			if (setMoment)
 			{
