@@ -49,7 +49,7 @@ namespace GameCore
 			physicsSpace.Iterations = 10;
 			physicsSpace.CollisionBias = Math.Pow(0.5, 60.0);
 			physicsSpace.CollisionSlop = 0.5;
-			physicsSpace.Gravity = .(0, -2000.0);
+			physicsSpace.Gravity = .(0, -980.0);
 			physicsSpace.SleepTimeThreshold = 0.5;
 
 			debugDraw.Initialize();
@@ -73,7 +73,10 @@ namespace GameCore
 					OnPostStepCallback(frameRate.DeltaTime);
 				}
 			}
+		}
 
+		public static void DebugDraw()
+		{
 			if (IsDebugDrawEnabled)
 			{
 				debugDraw.DebugDraw(physicsSpace);

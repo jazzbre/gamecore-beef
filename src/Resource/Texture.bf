@@ -32,9 +32,71 @@ namespace GameCore
 
 		public static Dictionary<String, Sprite> spriteMap = new Dictionary<String, Sprite>() ~ delete _;
 
-		public Chipmunk2D.Shape CreateShape(Chipmunk2D.Body body, Vector2 offset = .Zero, double radius = 0.0, bool setMoment = true, SpriteFlags spriteFlags = .None)
+		public delegate bool UpdateVertexDelegate(Vector2 v, out Vector2 offset);
+
+		public static Vector2 PushToBounds(Vector2 v)
 		{
-			var verts = scope Chipmunk2D.Vector2[convexHull.Count / 2];
+			return .(v.x < 0.5f ? 0.0f : 1.0f, v.y < 0.5f ? 0.0f : 1.0f);
+			// Center of the 0..1 square
+			Vector2 center = .(0.5f, 0.5f);
+
+			// Direction from center
+			float dx = v.x - center.x;
+			float dy = v.y - center.y;
+
+			// If already at center, just pick an arbitrary edge
+			if (dx == 0 && dy == 0)
+				return .(0.5f, 1.0f);
+
+			// Compute scale needed to hit each boundary
+			float tX = float.PositiveInfinity;
+			if (dx > 0) tX = (1.0f - center.x) / dx;
+			else if (dx < 0) tX = (0.0f - center.x) / dx;
+
+			float tY = float.PositiveInfinity;
+			if (dy > 0) tY = (1.0f - center.y) / dy;
+			else if (dy < 0) tY = (0.0f - center.y) / dy;
+
+			// Choose smallest positive t (first edge hit)
+			float t = Math.Min(tX, tY);
+
+			// Return point on edge
+			return .(center.x + dx * t, center.y + dy * t);
+		}
+
+		public static Vector2 ClosestPointOnBounds(Vector2 v)
+		{
+			// Clamp to square first
+			float cx = Math.Min(Math.Max(v.x, 0.0f), 1.0f);
+			float cy = Math.Min(Math.Max(v.y, 0.0f), 1.0f);
+
+			// Distances to each edge
+			float distLeft   = cx - 0.0f;
+			float distRight  = 1.0f - cx;
+			float distBottom = cy - 0.0f;
+			float distTop    = 1.0f - cy;
+
+			// Find the closest edge
+			float minDist = distLeft;
+			int edge = 0; // 0=left, 1=right, 2=bottom, 3=top
+
+			if (distRight < minDist) { minDist = distRight; edge = 1; }
+			if (distBottom < minDist) { minDist = distBottom; edge = 2; }
+			if (distTop < minDist) { minDist = distTop; edge = 3; }
+
+			// Snap coordinate to that edge
+			switch (edge)
+			{
+			case 0: cx = 0.0f; break; // Left
+			case 1: cx = 1.0f; break; // Right
+			case 2: cy = 0.0f; break; // Bottom
+			case 3: cy = 1.0f; break; // Top
+			}
+			return .(cx, cy);
+		}
+
+		public bool GenerateShapeVertices(Vector2[] verts, Vector2 offset = .Zero, SpriteFlags spriteFlags = .None, UpdateVertexDelegate updateVertexDelegate = null)
+		{
 			var scale = size.xy;
 			let flipU = (spriteFlags & .FlipU) != 0;
 			let flipV = (spriteFlags & .FlipV) != 0;
@@ -45,6 +107,7 @@ namespace GameCore
 				index = convexHull.Count / 2 - 1;
 				increment = -1;
 			}
+			bool updated = false;
 			for (int i = 0; i < convexHull.Count; i += 2)
 			{
 				var point = Vector2(convexHull[i + 0], convexHull[i + 1]);
@@ -56,8 +119,31 @@ namespace GameCore
 				{
 					point.y = 1.0f - point.y;
 				}
-				verts[index] = Chipmunk2D.Vector2.FromVector(offset + point * scale);
+				var vertex = offset + point * scale;
+				if (updateVertexDelegate != null)
+				{
+					var testVertex = offset + Vector2.Round(point) * scale;
+					Vector2 updateOffset = .Zero;
+					if (updateVertexDelegate(testVertex, out updateOffset))
+					{
+						vertex += updateOffset;
+						updated = true;
+					}
+				}
+				verts[index] = vertex;
 				index += increment;
+			}
+			return updated;
+		}
+
+		public Chipmunk2D.Shape CreateShape(Chipmunk2D.Body body, Vector2 offset = .Zero, double radius = 0.0, bool setMoment = true, SpriteFlags spriteFlags = .None)
+		{
+			var inputVerts = scope Vector2[convexHull.Count / 2];
+			GenerateShapeVertices(inputVerts, offset, spriteFlags);
+			var verts = scope Chipmunk2D.Vector2[convexHull.Count / 2];
+			for (int i = 0; i < inputVerts.Count; ++i)
+			{
+				verts[i] = Chipmunk2D.Vector2.FromVector(inputVerts[i]);
 			}
 			if (setMoment)
 			{

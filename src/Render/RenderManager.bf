@@ -10,6 +10,7 @@ namespace GameCore
 		Font,
 		Field,
 		Mesh3D,
+		StaticMesh3D,
 		Dialog,
 		Particle,
 		Last
@@ -49,17 +50,24 @@ namespace GameCore
 		public static List<RenderTexture> temporaryRenderTextures = new List<RenderTexture>();
 		public static List<RenderTexture> temporaryHalfRenderTextures = new List<RenderTexture>();
 
-		public static bgfx.TextureHandle readBackTextureHandle = .() { idx = uint16.MaxValue };
+		public static bgfx.TextureHandle readBackTextureHandle = .Null;
 
 		public static RenderTexture temporaryRenderTextureWithDepth;
 
-		public static int width = 640; // 320 * 1 + 320 / 4;
-		public static int height = 320; //180 * 1 + 180 / 4;
+		public static int width = 1280; // 320 * 1 + 320 / 4;
+		public static int height = 720; //180 * 1 + 180 / 4;
 		public static float ooWidth, ooHeight;
 		public static var viewBounds = Bounds2();
+		public static float aspectRatio = 1.0f;
 
 		public static bgfx.VertexBufferHandle batchVertexBufferHandle;
 		public static bgfx.IndexBufferHandle batchIndexBufferHandle;
+		public static int batchVertexCount;
+		public static int batchIndexCount;
+		public static bgfx.VertexBufferHandle batchTesselatedVertexBufferHandle;
+		public static bgfx.IndexBufferHandle batchTesselatedIndexBufferHandle;
+		public static int batchTesselatedVertexCount;
+		public static int batchTesselatedIndexCount;
 		public static bgfx.VertexLayout batchVertexLayout;
 
 		public static var textureUniformHandles = new bgfx.UniformHandle[8] ~ delete _;
@@ -69,6 +77,7 @@ namespace GameCore
 		public static bgfx.UniformHandle textureScaleUniformHandle;
 		public static bgfx.UniformHandle instanceDataUniformHandle;
 		public static bgfx.UniformHandle instanceDataPSUniformHandle;
+		public static bgfx.UniformHandle shUniformHandle;
 
 		public static var shaders = new Shader[(int)RenderShaderType.Last] ~ DeleteAndNullify!(_);
 
@@ -84,6 +93,8 @@ namespace GameCore
 
 		public static bgfx.RendererType RendererType { get; private set; }
 		public static bgfx.RendererType ShaderRendererType { get; private set; }
+
+		public static SH9 sh9 = new .() ~ delete _;
 
 		public static Shader GetShader(RenderShaderType type)
 		{
@@ -103,6 +114,7 @@ namespace GameCore
 			SDL2.SDL.Log(scope $"Renderer:{RendererType}, {width}x{height}, IsRenderTextureYFlipped {IsRenderTextureYFlipped}");
 			ooWidth = 1.0f / width;
 			ooHeight = 1.0f / height;
+			aspectRatio = width * ooHeight;
 			viewBounds = .(.Zero, .(width, height));
 			batchRenderer = new .();
 			entityBatchRenderer = new .();
@@ -117,50 +129,22 @@ namespace GameCore
 			bgfx.vertex_layout_begin(&batchVertexLayout, bgfx.get_renderer_type());
 			bgfx.vertex_layout_add(&batchVertexLayout, bgfx.Attrib.Position, 3, bgfx.AttribType.Float, false, false);
 			bgfx.vertex_layout_end(&batchVertexLayout);
-			{
-				var vertices = scope Vector3[maxBatchCount * 4];
-				float instanceIndex = 0.0f;
-				readonly Vector3[4] quad = Vector3[4](
-					Vector3(0.0f, 0.0f, 0.0f),
-					Vector3(1.0f, 0.0f, 0.0f),
-					Vector3(1.0f, 1.0f, 0.0f),
-					Vector3(0.0f, 1.0f, 0.0f)
-					);
-				for (int i = 0; i < vertices.Count; i += 4,instanceIndex += 4.0f)
-				{
-					for (int j = 0; j < 4; ++j)
-					{
-						vertices[i + j] = quad[j];
-						vertices[i + j].z = instanceIndex;
-					}
-				}
-				batchVertexBufferHandle = bgfx.create_vertex_buffer(bgfx.copy(&vertices[0], (uint32)(vertices.Count * sizeof(Vector3))), &batchVertexLayout, 0);
-			}
-			{
-				var indices = scope uint16[maxBatchCount * 6];
-				uint16 vertexIndex = 0;
-				for (int i = 0; i < indices.Count; i += 6,vertexIndex += 4)
-				{
-					indices[i + 0] = vertexIndex;
-					indices[i + 1] = vertexIndex + 1;
-					indices[i + 2] = vertexIndex + 2;
-					indices[i + 3] = vertexIndex;
-					indices[i + 4] = vertexIndex + 2;
-					indices[i + 5] = vertexIndex + 3;
-				}
-				batchIndexBufferHandle = bgfx.create_index_buffer(bgfx.copy(&indices[0], (uint32)(indices.Count * sizeof(uint16))), 0);
-			}
+			// Default quad
+			CreateQuad(1, 1, maxBatchCount, out batchVertexBufferHandle, out batchIndexBufferHandle, out batchVertexCount, out batchIndexCount);
+			// Tesselated
+			CreateQuad(2, 2, maxBatchCount, out batchTesselatedVertexBufferHandle, out batchTesselatedIndexBufferHandle, out batchTesselatedVertexCount, out batchTesselatedIndexCount);
 			// Load shaders
-			shaders[0] = ResourceManager.GetResource<Shader>("shaders/generic_sprite_texture");
-			shaders[1] = ResourceManager.GetResource<Shader>("shaders/font_sprite_texture");
-			shaders[2] = ResourceManager.GetResource<Shader>("shaders/field");
-			shaders[3] = ResourceManager.GetResource<Shader>("shaders/mesh3d");
-			shaders[4] = ResourceManager.GetResource<Shader>("shaders/dialog");
-			shaders[5] = ResourceManager.GetResource<Shader>("shaders/particle");
+			shaders[(int)RenderShaderType.Default] = ResourceManager.GetResource<Shader>("shaders/generic_sprite_texture");
+			shaders[(int)RenderShaderType.Font] = ResourceManager.GetResource<Shader>("shaders/font_sprite_texture");
+			shaders[(int)RenderShaderType.Field] = ResourceManager.GetResource<Shader>("shaders/field");
+			shaders[(int)RenderShaderType.Mesh3D] = ResourceManager.GetResource<Shader>("shaders/mesh3d");
+			shaders[(int)RenderShaderType.StaticMesh3D] = ResourceManager.GetResource<Shader>("shaders/staticmesh3d");
+			shaders[(int)RenderShaderType.Dialog] = ResourceManager.GetResource<Shader>("shaders/dialog");
+			shaders[(int)RenderShaderType.Particle] = ResourceManager.GetResource<Shader>("shaders/particle");
 			textureUniformHandles[0] = bgfx.create_uniform("s_texture", bgfx.UniformType.Sampler, 1);
 			for (int i = 1; i < textureUniformHandles.Count; ++i)
 			{
-				textureUniformHandles[i] = bgfx.create_uniform(scope $"s_texture{i+1}", bgfx.UniformType.Sampler, 1);
+				textureUniformHandles[i] = bgfx.create_uniform(scope $"s_texture{i + 1}" , bgfx.UniformType.Sampler, 1);
 			}
 			colorUniformHandle = bgfx.create_uniform("s_color", bgfx.UniformType.Vec4, 1);
 			timeUniformHandle = bgfx.create_uniform("s_time", bgfx.UniformType.Vec4, 1);
@@ -168,6 +152,7 @@ namespace GameCore
 			textureScaleUniformHandle = bgfx.create_uniform("s_textureScale", bgfx.UniformType.Vec4, 1);
 			instanceDataUniformHandle = bgfx.create_uniform("s_instanceData", bgfx.UniformType.Vec4, (uint16)256);
 			instanceDataPSUniformHandle = bgfx.create_uniform("s_instanceDataPS", bgfx.UniformType.Vec4, (uint16)8);
+			shUniformHandle = bgfx.create_uniform("s_sh", bgfx.UniformType.Vec4, (uint16)9);
 			if (capture)
 			{
 				readBackTextureHandle = bgfx.create_texture_2d((.)width, (.)height, false, 1, .RGBA8, (.)(bgfx.TextureFlags.ReadBack | bgfx.TextureFlags.BlitDst), null);
@@ -188,6 +173,7 @@ namespace GameCore
 			bgfx.destroy_uniform(textureScaleUniformHandle);
 			bgfx.destroy_uniform(instanceDataUniformHandle);
 			bgfx.destroy_uniform(instanceDataPSUniformHandle);
+			bgfx.destroy_uniform(shUniformHandle);
 			delete batchRenderer;
 			delete entityBatchRenderer;
 			DeleteContainerAndItems!(temporaryRenderTextures);
@@ -330,24 +316,49 @@ namespace GameCore
 			++RenderManager.statistics.submitCount;
 		}
 
-		public static void RenderQuads(uint16 viewId, Matrix4 _worldMatrix, Shader shader, int quadCount, Vector4* instanceData, int instanceDataCount, Vector4 settings, Vector4 textureScale, bgfx.TextureHandle[] textureHandles, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int programIndex = 0)
+		public static void RenderMeshes(uint16 viewId, Matrix4 _worldMatrix, Shader shader, int quadCount, Vector4* instanceData, int instanceDataCount, Vector4 settings, Vector4 textureScale, bgfx.TextureHandle[] textureHandles, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int programIndex = 0, bool tesselated = false)
 		{
 			var stateFlags = _stateFlags != 0 ? _stateFlags : bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.DepthTestAlways | bgfx.blend_function(bgfx.StateFlags.BlendSrcAlpha, bgfx.StateFlags.BlendInvSrcAlpha);
 			var samplerFlags = _samplerFlags != 0 ? (uint32)_samplerFlags : (uint32)(bgfx.SamplerFlags.UClamp | bgfx.SamplerFlags.VClamp | bgfx.SamplerFlags.Point);
 				// Render
 			var worldMatrix = _worldMatrix;
+
+			bgfx.VertexBufferHandle vertexBuffer;
+			bgfx.IndexBufferHandle indexBuffer;
+			int vertexCount;
+			int indexCount;
+
+			if (tesselated)
+			{
+				vertexBuffer = batchTesselatedVertexBufferHandle;
+				indexBuffer = batchTesselatedIndexBufferHandle;
+				vertexCount = batchTesselatedVertexCount;
+				indexCount = batchTesselatedIndexCount;
+			}
+			else
+			{
+				vertexBuffer = batchVertexBufferHandle;
+				indexBuffer = batchIndexBufferHandle;
+				vertexCount = batchVertexCount;
+				indexCount = batchIndexCount;
+			}
+
 			bgfx.set_transform(worldMatrix.Ptr(), 1);
 			bgfx.set_state((uint64)stateFlags, 0);
 			bgfx.set_uniform(instanceDataUniformHandle, instanceData, (uint16)instanceDataCount);
 			bgfx.set_uniform(timeUniformHandle, &ShaderData.x, 1);
 			bgfx.set_uniform(settingsUniformHandle, &settings.x, 1);
 			bgfx.set_uniform(textureScaleUniformHandle, &textureScale.x, 1);
-			bgfx.set_vertex_buffer(0, batchVertexBufferHandle, 0, (uint32)(quadCount * 4));
-			bgfx.set_index_buffer(batchIndexBufferHandle, 0, (uint32)(quadCount * 6));
+			bgfx.set_vertex_buffer(0, vertexBuffer, 0, (uint32)(quadCount * vertexCount));
+			bgfx.set_index_buffer(indexBuffer, 0, (uint32)(quadCount * indexCount));
 			if (textureHandles != null)
 			{
 				for (int i = 0; i < textureHandles.Count; ++i)
 				{
+					if (!textureHandles[i].Valid)
+					{
+						continue;
+					}
 					bgfx.set_texture((uint8)i, textureUniformHandles[i], textureHandles[i], samplerFlags);
 				}
 			}
@@ -390,6 +401,68 @@ namespace GameCore
 			{
 				bgfx.set_view_rect(_id, _x, _y, _width, _height);
 			}
+		}
+
+		public static void CreateQuad(int tessX, int tessY, int batchCount, out bgfx.VertexBufferHandle outVertexBuffer, out bgfx.IndexBufferHandle outIndexBuffer, out int vertsPerBatch, out int indicesPerBatch)
+		{
+			vertsPerBatch = (tessX + 1) * (tessY + 1);
+			indicesPerBatch = tessX * tessY * 6;
+
+			int totalVertCount = vertsPerBatch * batchCount;
+			int totalIndexCount = indicesPerBatch * batchCount;
+
+			var vertices = scope Vector3[totalVertCount];
+			var indices  = scope uint16[totalIndexCount];
+
+			int v = 0;
+			int i = 0;
+			float instanceIndex = 0.0f;
+
+			for (int batch = 0; batch < batchCount; batch++,instanceIndex += 4.0f)
+			{
+				int baseVertex = v;
+
+				// Create vertices for this batch
+				for (int y = 0; y <= tessY; y++)
+				{
+					float fy = (float)y / (float)tessY;
+					for (int x = 0; x <= tessX; x++)
+					{
+						float fx = (float)x / (float)tessX;
+						vertices[v++] = Vector3(fx, fy, instanceIndex);
+					}
+				}
+
+				// Create indices for this batch
+				for (int ty = 0; ty < tessY; ty++)
+				{
+					for (int tx = 0; tx < tessX; tx++)
+					{
+						uint16 v0 = (uint16)(baseVertex + ty * (tessX + 1) + tx);
+						uint16 v1 = (uint16)(v0 + 1);
+						uint16 v2 = (uint16)(v0 + (tessX + 1));
+						uint16 v3 = (uint16)(v2 + 1);
+
+						// First triangle
+						indices[i++] = v0;
+						indices[i++] = v1;
+						indices[i++] = v3;
+
+						// Second triangle
+						indices[i++] = v0;
+						indices[i++] = v3;
+						indices[i++] = v2;
+					}
+				}
+			}
+
+			outVertexBuffer = bgfx.create_vertex_buffer(bgfx.copy(&vertices[0], (uint32)(vertices.Count * sizeof(Vector3))), &batchVertexLayout, 0);
+			outIndexBuffer = bgfx.create_index_buffer(bgfx.copy(&indices[0], (uint32)(indices.Count * sizeof(uint16))), 0);
+		}
+
+		public static void SetSHRenderState()
+		{
+			bgfx.set_uniform(shUniformHandle, &sh9.sh[0].x, 9);
 		}
 	}
 }

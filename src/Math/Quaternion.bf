@@ -589,7 +589,7 @@ namespace GameCore
 			result.w = quaternion.w * num;
 		}
 
-		public static Quaternion operator+(Quaternion quaternion1, Quaternion quaternion2)
+		public static Quaternion operator +(Quaternion quaternion1, Quaternion quaternion2)
 		{
 			Quaternion quaternion;
 			quaternion.x = quaternion1.x + quaternion2.x;
@@ -599,7 +599,7 @@ namespace GameCore
 			return quaternion;
 		}
 
-		public static Quaternion operator/(Quaternion quaternion1, Quaternion quaternion2)
+		public static Quaternion operator /(Quaternion quaternion1, Quaternion quaternion2)
 		{
 			Quaternion quaternion;
 			float x = quaternion1.x;
@@ -623,19 +623,19 @@ namespace GameCore
 			return quaternion;
 		}
 
-		public static bool operator==(Quaternion quaternion1, Quaternion quaternion2)
+		public static bool operator ==(Quaternion quaternion1, Quaternion quaternion2)
 		{
 			return ((((quaternion1.x == quaternion2.x) && (quaternion1.y == quaternion2.y)) && (quaternion1.z == quaternion2.z)) && (quaternion1.w == quaternion2.w));
 		}
 
-		public static bool operator!=(Quaternion quaternion1, Quaternion quaternion2)
+		public static bool operator !=(Quaternion quaternion1, Quaternion quaternion2)
 		{
 			if (((quaternion1.x == quaternion2.x) && (quaternion1.y == quaternion2.y)) && (quaternion1.z == quaternion2.z))
 				return (quaternion1.w != quaternion2.w);
 			return true;
 		}
 
-		public static Quaternion operator*(Quaternion quaternion1, Quaternion quaternion2)
+		public static Quaternion operator *(Quaternion quaternion1, Quaternion quaternion2)
 		{
 			Quaternion quaternion;
 			float x = quaternion1.x;
@@ -657,7 +657,7 @@ namespace GameCore
 			return quaternion;
 		}
 
-		public static Quaternion operator*(Quaternion quaternion1, float scaleFactor)
+		public static Quaternion operator *(Quaternion quaternion1, float scaleFactor)
 		{
 			Quaternion quaternion;
 			quaternion.x = quaternion1.x * scaleFactor;
@@ -667,7 +667,7 @@ namespace GameCore
 			return quaternion;
 		}
 
-		public static Quaternion operator-(Quaternion quaternion1, Quaternion quaternion2)
+		public static Quaternion operator -(Quaternion quaternion1, Quaternion quaternion2)
 		{
 			Quaternion quaternion;
 			quaternion.x = quaternion1.x - quaternion2.x;
@@ -677,7 +677,7 @@ namespace GameCore
 			return quaternion;
 		}
 
-		public static Quaternion operator-(Quaternion quaternion)
+		public static Quaternion operator -(Quaternion quaternion)
 		{
 			Quaternion quaternion2;
 			quaternion2.x = -quaternion.x;
@@ -772,10 +772,10 @@ namespace GameCore
 			{
 				if (sinp < 0)
 				{
-					angles.y = -Math.PI_f / 2;// use 90 degrees if out of range
+					angles.y = -Math.PI_f / 2; // use 90 degrees if out of range
 				} else
 				{
-					angles.y = Math.PI_f / 2;// use 90 degrees if out of range
+					angles.y = Math.PI_f / 2; // use 90 degrees if out of range
 				}
 			}
 			else

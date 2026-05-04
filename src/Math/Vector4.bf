@@ -31,6 +31,8 @@ namespace GameCore
 		public const Vector4 Forward = Vector4(0f, 0f, -1f, 0.0f);
 		public const Vector4 Backward = Vector4(0f, 0f, 1f, 0.0f);
 
+		public float* f mut => &x;
+
 		public float Length
 		{
 			get
@@ -241,7 +243,7 @@ namespace GameCore
 			return .(Vector4.Dot(vec, matrix.GetColumn4(0)), Vector4.Dot(vec, matrix.GetColumn4(1)), Vector4.Dot(vec, matrix.GetColumn4(2)), 1);
 		}
 
-		public static bool operator==(Vector4 value1, Vector4 value2)
+		public static bool operator ==(Vector4 value1, Vector4 value2)
 		{
 			return (value1.x == value2.x) &&
 				(value1.y == value2.y) &&
@@ -249,43 +251,43 @@ namespace GameCore
 				(value1.w == value2.w);
 		}
 
-		public static bool operator!=(Vector4 value1, Vector4 value2)
+		public static bool operator !=(Vector4 value1, Vector4 value2)
 		{
 			return !(value1 == value2);
 		}
 
-		public static Vector4 operator-(Vector4 vec1)
+		public static Vector4 operator -(Vector4 vec1)
 		{
 			return .(-vec1.x, -vec1.y, -vec1.z, -vec1.w);
 		}
 
-		public static Vector4 operator+(Vector4 vec1, Vector4 vec2)
+		public static Vector4 operator +(Vector4 vec1, Vector4 vec2)
 		{
 			return .(vec1.x + vec2.x, vec1.y + vec2.y, vec1.z + vec2.z, vec1.w + vec2.w);
 		}
 
-		public static Vector4 operator-(Vector4 vec1, Vector4 vec2)
+		public static Vector4 operator -(Vector4 vec1, Vector4 vec2)
 		{
 			return .(vec1.x - vec2.x, vec1.y - vec2.y, vec1.z - vec2.z, vec1.w - vec2.w);
 		}
 
-		public static Vector4 operator*(Vector4 vec1, Vector4 vec2)
+		public static Vector4 operator *(Vector4 vec1, Vector4 vec2)
 		{
 			return .(vec1.x * vec2.x, vec1.y * vec2.y, vec1.z * vec2.z, vec1.w * vec2.w);
 		}
 
-		public static Vector4 operator/(Vector4 vec1, Vector4 vec2)
+		public static Vector4 operator /(Vector4 vec1, Vector4 vec2)
 		{
 			return .(vec1.x / vec2.x, vec1.y / vec2.y, vec1.z / vec2.z, vec1.w / vec2.w);
 		}
 
 		[Commutable]
-		public static Vector4 operator*(Vector4 vec, float scale)
+		public static Vector4 operator *(Vector4 vec, float scale)
 		{
 			return .(vec.x * scale, vec.y * scale, vec.z * scale, vec.w * scale);
 		}
 
-		public static Vector4 operator/(Vector4 vec, float scale)
+		public static Vector4 operator /(Vector4 vec, float scale)
 		{
 			return .(vec.x / scale, vec.y / scale, vec.z / scale, vec.w / scale);
 		}

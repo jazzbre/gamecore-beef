@@ -28,6 +28,8 @@ namespace GameCore
 		public const Vector3 Forward = Vector3(0f, 0f, -1f);
 		public const Vector3 Backward = Vector3(0f, 0f, 1f);
 
+		public float* f mut => &x;
+
 		public float Length
 		{
 			get
@@ -227,50 +229,50 @@ namespace GameCore
 			return 2.0f * Vector3.Dot(unitVector, normal) * unitVector + (unitLength * unitLength - Vector3.Dot(unitVector, unitVector)) * normal + 2.0f * unitLength * Vector3.Cross(unitVector, normal);
 		}
 
-		public static bool operator==(Vector3 value1, Vector3 value2)
+		public static bool operator ==(Vector3 value1, Vector3 value2)
 		{
 			return (value1.x == value2.x) &&
 				(value1.y == value2.y) &&
 				(value1.z == value2.z);
 		}
 
-		public static bool operator!=(Vector3 value1, Vector3 value2)
+		public static bool operator !=(Vector3 value1, Vector3 value2)
 		{
 			return !(value1 == value2);
 		}
 
-		public static Vector3 operator-(Vector3 vec1)
+		public static Vector3 operator -(Vector3 vec1)
 		{
 			return .(-vec1.x, -vec1.y, -vec1.z);
 		}
 
-		public static Vector3 operator+(Vector3 vec1, Vector3 vec2)
+		public static Vector3 operator +(Vector3 vec1, Vector3 vec2)
 		{
 			return .(vec1.x + vec2.x, vec1.y + vec2.y, vec1.z + vec2.z);
 		}
 
-		public static Vector3 operator-(Vector3 vec1, Vector3 vec2)
+		public static Vector3 operator -(Vector3 vec1, Vector3 vec2)
 		{
 			return .(vec1.x - vec2.x, vec1.y - vec2.y, vec1.z - vec2.z);
 		}
 
-		public static Vector3 operator*(Vector3 vec1, Vector3 vec2)
+		public static Vector3 operator *(Vector3 vec1, Vector3 vec2)
 		{
 			return .(vec1.x * vec2.x, vec1.y * vec2.y, vec1.z * vec2.z);
 		}
 
-		public static Vector3 operator/(Vector3 vec1, Vector3 vec2)
+		public static Vector3 operator /(Vector3 vec1, Vector3 vec2)
 		{
 			return .(vec1.x / vec2.x, vec1.y / vec2.y, vec1.z / vec2.z);
 		}
 
 		[Commutable]
-		public static Vector3 operator*(Vector3 vec, float scale)
+		public static Vector3 operator *(Vector3 vec, float scale)
 		{
 			return .(vec.x * scale, vec.y * scale, vec.z * scale);
 		}
 
-		public static Vector3 operator/(Vector3 vec, float scale)
+		public static Vector3 operator /(Vector3 vec, float scale)
 		{
 			return .(vec.x / scale, vec.y / scale, vec.z / scale);
 		}

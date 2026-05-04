@@ -27,7 +27,7 @@ namespace GameCore
 				FrameBufferHandle = bgfx.create_frame_buffer_from_handles(2, &handles, true);
 			} else
 			{
-				DepthHandle = .() { idx = uint16.MaxValue };
+				DepthHandle = .Null;
 				bgfx.TextureHandle[1] handles;
 				handles[0] = TextureHandle;
 				FrameBufferHandle = bgfx.create_frame_buffer_from_handles(1, &handles, true);

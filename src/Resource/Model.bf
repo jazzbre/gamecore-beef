@@ -22,7 +22,7 @@ namespace GameCore
 			DeleteAndNullify!(Mesh);
 		}
 
-		public void Render(uint16 viewId, Matrix4 _worldMatrix, Shader shader, Vector4 color = .One, Vector4 settings = .Zero, bgfx.TextureHandle[] textureHandles = null, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int programIndex = 0)
+		public void Render(uint16 viewId, Matrix4 _worldMatrix, Shader shader, Vector4 color = .One, Vector4 settings = .Zero, bgfx.TextureHandle[] textureHandles = null, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int programIndex = 0, bool useSH = false)
 		{
 			var stateFlags = _stateFlags != 0 ? _stateFlags : bgfx.StateFlags.WriteRgb | .WriteA | .WriteZ | .DepthTestLequal | RenderManager.GetCullingState(true);
 			var samplerFlags = _samplerFlags != 0 ? (uint32)_samplerFlags : (uint32)(bgfx.SamplerFlags.UClamp | bgfx.SamplerFlags.VClamp);
@@ -47,6 +47,10 @@ namespace GameCore
 				} else if (group.texture != null)
 				{
 					bgfx.set_texture(0, RenderManager.textureUniformHandles[0], group.texture.Handle, samplerFlags);
+				}
+				if (useSH)
+				{
+					RenderManager.SetSHRenderState();
 				}
 				bgfx.submit(viewId, shader.Programs[programIndex], 0, (uint8)bgfx.DiscardFlags.All);
 				++RenderManager.statistics.submitCount;

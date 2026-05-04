@@ -5,35 +5,37 @@ using Bgfx;
 namespace GameCore
 {
 	[CRepr]
-	struct MeshVertex
+	struct Mesh3DVertex
 	{
-		public Vector2 position;
+		public Vector3 position;
+		public Vector3 normal;
 		public Vector4 uv;
 		public uint32 color;
 
-		public this(Vector2 _position, Vector4 _uv, uint32 _color)
+		public this(Vector3 _position, Vector3 _normal, Vector4 _uv, uint32 _color)
 		{
 			position = _position;
+			normal = _normal;
 			uv = _uv;
 			color = _color;
 		}
 
-		public static MeshVertex Lerp(MeshVertex a, MeshVertex b, float delta)
+		public static Mesh3DVertex Lerp(Mesh3DVertex a, Mesh3DVertex b, float delta)
 		{
-			return .(.Lerp(a.position, b.position, delta), .Lerp(a.uv, b.uv, delta), a.color);
+			return .(.Lerp(a.position, b.position, delta), .Lerp(a.normal, b.normal, delta), .Lerp(a.uv, b.uv, delta), a.color);
 		}
 	}
 
-	class Mesh
+	class Mesh3D
 	{
 		public bgfx.VertexBufferHandle VertexBufferHandle { get; private set; }
 		public bgfx.IndexBufferHandle IndexBufferHandle { get; private set; }
 
-		public List<MeshVertex> Vertices { get; private set; }
+		public List<Mesh3DVertex> Vertices { get; private set; }
 		public List<uint16> Indices { get; private set; }
 
-		public Vector2 MinBounds { get; private set; }
-		public Vector2 MaxBounds { get; private set; }
+		public Vector3 MinBounds { get; private set; }
+		public Vector3 MaxBounds { get; private set; }
 
 		public Vector4 MinUV { get; private set; }
 		public Vector4 MaxUV { get; private set; }
@@ -59,14 +61,15 @@ namespace GameCore
 			if (vertexLayout.hash == 0)
 			{
 				bgfx.vertex_layout_begin(&vertexLayout, bgfx.get_renderer_type());
-				bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.Position, 2, bgfx.AttribType.Float, false, false);
+				bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.Position, 3, bgfx.AttribType.Float, false, false);
+				bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.Normal, 3, bgfx.AttribType.Float, false, false);
 				bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.TexCoord0, 4, bgfx.AttribType.Float, false, false);
 				bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.Color0, 4, bgfx.AttribType.Uint8, true, false);
 				bgfx.vertex_layout_end(&vertexLayout);
 			}
 			if (Vertices == null)
 			{
-				Vertices = new List<MeshVertex>();
+				Vertices = new List<Mesh3DVertex>();
 			}
 			if (Indices == null)
 			{
@@ -91,16 +94,16 @@ namespace GameCore
 
 		public void Create()
 		{
-			VertexBufferHandle = bgfx.create_vertex_buffer(bgfx.copy(&Vertices[0], (uint32)(Vertices.Count * sizeof(MeshVertex))), &vertexLayout, 0);
+			VertexBufferHandle = bgfx.create_vertex_buffer(bgfx.copy(&Vertices[0], (uint32)(Vertices.Count * sizeof(Mesh3DVertex))), &vertexLayout, 0);
 			IndexBufferHandle = bgfx.create_index_buffer(bgfx.copy(&Indices[0], (uint32)(Indices.Count * sizeof(uint16))), 0);
 			MinBounds = MinBounds = Vertices[0].position;
 			MinUV = MaxUV = Vertices[0].uv;
 			for (var vertex in Vertices)
 			{
-				MinBounds = Vector2.Min(MinBounds, vertex.position);
-				MaxBounds = Vector2.Max(MaxBounds, vertex.position);
-				MinUV = Vector4.Min(MinUV, vertex.uv);
-				MaxUV = Vector4.Max(MaxUV, vertex.uv);
+				MinBounds = .Min(MinBounds, vertex.position);
+				MaxBounds = .Max(MaxBounds, vertex.position);
+				MinUV = .Min(MinUV, vertex.uv);
+				MaxUV = .Max(MaxUV, vertex.uv);
 			}
 		}
 
@@ -124,7 +127,7 @@ namespace GameCore
 			{
 				return;
 			}
-			var stateFlags = _stateFlags != 0 ? _stateFlags : bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.DepthTestAlways | bgfx.blend_function(bgfx.StateFlags.BlendSrcAlpha, bgfx.StateFlags.BlendInvSrcAlpha);
+			var stateFlags = _stateFlags != 0 ? _stateFlags : bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | bgfx.StateFlags.DepthTestLequal | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
 			var matrix = worldMatrix;
 			bgfx.set_transform(matrix.Ptr(), 1);
 			bgfx.set_state((uint64)stateFlags, 0);

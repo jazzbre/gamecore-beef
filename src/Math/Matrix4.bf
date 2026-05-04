@@ -313,10 +313,10 @@ namespace GameCore
 		public static Matrix4 CreateTranslation(float x, float y, float z)
 		{
 			return Matrix4(
-				1, 0, 0, x,
-				0, 1, 0, y,
-				0, 0, 1, z,
-				0, 0, 0, 1);
+				1, 0, 0, 0,
+				0, 1, 0, 0,
+				0, 0, 1, 0,
+				x, y, z, 1);
 		}
 
 		public static Matrix4 CreateTransform(Vector3 position, Vector3 scale, Quaternion orientation)
@@ -326,10 +326,10 @@ namespace GameCore
 
 			Matrix4 rot = orientation.ToMatrix();
 			return Matrix4(
-				scale.x * rot.v.m00, scale.y * rot.v.m01, scale.z * rot.v.m02, position.x,
-				scale.x * rot.v.m10, scale.y * rot.v.m11, scale.z * rot.v.m12, position.y,
-				scale.x * rot.v.m20, scale.y * rot.v.m21, scale.z * rot.v.m22, position.z,
-				0, 0, 0, 1);
+				scale.x * rot.v.m00, scale.x * rot.v.m01, scale.x * rot.v.m02, 0,
+				scale.y * rot.v.m10, scale.y * rot.v.m11, scale.y * rot.v.m12, 0,
+				scale.z * rot.v.m20, scale.z * rot.v.m21, scale.z * rot.v.m22, 0,
+				position.x, position.y, position.z, 1);
 		}
 
 		public static Matrix4 CreateRotationX(float radians)
@@ -500,6 +500,23 @@ namespace GameCore
 			m.d[14] = -bb;
 		}
 
+		public static Matrix4 CreatePixelPerfectOrtho(float width, float height, float near, float far)
+		{
+			Matrix4 m = Identity;
+
+			m.v.m00 =  2.0f / width;
+			m.v.m11 = -2.0f / height;
+			m.v.m22 =  1.0f / (far - near);
+
+			// Pixel-center bias
+			m.v.m30 = -1.0f - (1.0f / width * 2);
+			m.v.m31 =  1.0f - (1.0f / height * 2);
+			m.v.m32 = -near / (far - near);
+			m.v.m33 =  1.0f;
+
+			return m;
+		}
+
 		bool IsAffine()
 		{
 			return v.m30 == 0 && v.m31 == 0 && v.m32 == 0 && v.m33 == 1;
@@ -547,6 +564,56 @@ namespace GameCore
 				r10, r11, r12, r13,
 				r20, r21, r22, r23,
 				0, 0, 0, 1);
+		}
+
+		public static Matrix4 Inverse(Matrix4 mtx)
+		{
+			float xx = mtx.d[0];
+			float xy = mtx.d[1];
+			float xz = mtx.d[2];
+			float xw = mtx.d[3];
+			float yx = mtx.d[4];
+			float yy = mtx.d[5];
+			float yz = mtx.d[6];
+			float yw = mtx.d[7];
+			float zx = mtx.d[8];
+			float zy = mtx.d[9];
+			float zz = mtx.d[10];
+			float zw = mtx.d[11];
+			float wx = mtx.d[12];
+			float wy = mtx.d[13];
+			float wz = mtx.d[14];
+			float ww = mtx.d[15];
+
+			float det = 0.0f;
+			det += xx * (yy * (zz * ww - zw * wz) - yz * (zy * ww - zw * wy) + yw * (zy * wz - zz * wy));
+			det -= xy * (yx * (zz * ww - zw * wz) - yz * (zx * ww - zw * wx) + yw * (zx * wz - zz * wx));
+			det += xz * (yx * (zy * ww - zw * wy) - yy * (zx * ww - zw * wx) + yw * (zx * wy - zy * wx));
+			det -= xw * (yx * (zy * wz - zz * wy) - yy * (zx * wz - zz * wx) + yz * (zx * wy - zy * wx));
+
+			float invDet = 1.0f / det;
+			Matrix4 inv = .();
+
+			inv.d[0] = +(yy * (zz * ww - wz * zw) - yz * (zy * ww - wy * zw) + yw * (zy * wz - wy * zz)) * invDet;
+			inv.d[1] = -(xy * (zz * ww - wz * zw) - xz * (zy * ww - wy * zw) + xw * (zy * wz - wy * zz)) * invDet;
+			inv.d[2] = +(xy * (yz * ww - wz * yw) - xz * (yy * ww - wy * yw) + xw * (yy * wz - wy * yz)) * invDet;
+			inv.d[3] = -(xy * (yz * zw - zz * yw) - xz * (yy * zw - zy * yw) + xw * (yy * zz - zy * yz)) * invDet;
+
+			inv.d[4] = -(yx * (zz * ww - wz * zw) - yz * (zx * ww - wx * zw) + yw * (zx * wz - wx * zz)) * invDet;
+			inv.d[5] = +(xx * (zz * ww - wz * zw) - xz * (zx * ww - wx * zw) + xw * (zx * wz - wx * zz)) * invDet;
+			inv.d[6] = -(xx * (yz * ww - wz * yw) - xz * (yx * ww - wx * yw) + xw * (yx * wz - wx * yz)) * invDet;
+			inv.d[7] = +(xx * (yz * zw - zz * yw) - xz * (yx * zw - zx * yw) + xw * (yx * zz - zx * yz)) * invDet;
+
+			inv.d[8] = +(yx * (zy * ww - wy * zw) - yy * (zx * ww - wx * zw) + yw * (zx * wy - wx * zy)) * invDet;
+			inv.d[9] = -(xx * (zy * ww - wy * zw) - xy * (zx * ww - wx * zw) + xw * (zx * wy - wx * zy)) * invDet;
+			inv.d[10] = +(xx * (yy * ww - wy * yw) - xy * (yx * ww - wx * yw) + xw * (yx * wy - wx * yy)) * invDet;
+			inv.d[11] = -(xx * (yy * zw - zy * yw) - xy * (yx * zw - zx * yw) + xw * (yx * zy - zx * yy)) * invDet;
+
+			inv.d[12] = -(yx * (zy * wz - wy * zz) - yy * (zx * wz - wx * zz) + yz * (zx * wy - wx * zy)) * invDet;
+			inv.d[13] = +(xx * (zy * wz - wy * zz) - xy * (zx * wz - wx * zz) + xz * (zx * wy - wx * zy)) * invDet;
+			inv.d[14] = -(xx * (yy * wz - wy * yz) - xy * (yx * wz - wx * yz) + xz * (yx * wy - wx * yy)) * invDet;
+			inv.d[15] = +(xx * (yy * zz - zy * yz) - xy * (yx * zz - zx * yz) + xz * (yx * zy - zx * yy)) * invDet;
+			return inv;
 		}
 
 		public static Matrix4 operator *(Matrix4 mat1, Matrix4 mat2)

@@ -14,6 +14,7 @@ namespace GameCore
 
 		public const Vector2 Zero = Vector2(0f, 0f);
 		public const Vector2 One = Vector2(1f, 1f);
+		public const Vector2 Two = Vector2(2f, 2f);
 		public const Vector2 Half = Vector2(0.5f, 0.5f);
 		public const Vector2 UnitX = Vector2(1f, 0f);
 		public const Vector2 UnitY = Vector2(0f, 1f);
@@ -21,6 +22,8 @@ namespace GameCore
 		public const Vector2 Down = Vector2(0f, -1f);
 		public const Vector2 Right = Vector2(1f, 0f);
 		public const Vector2 Left = Vector2(-1f, 0f);
+
+		public float* f mut => &x;
 
 		public float Length
 		{

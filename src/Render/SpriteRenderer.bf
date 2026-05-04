@@ -44,6 +44,8 @@ namespace GameCore
 		public uint16 ViewId { get; private set; }
 		public int BatchCount { get; private set; }
 		public Vector4 Settings { get; private set; }
+		public bool Tesselated { get; private set; }
+		public bgfx.TextureHandle VertexTextureHandle { get; set; } = .Null;
 
 		public this(int maxCount = 64)
 		{
@@ -55,7 +57,7 @@ namespace GameCore
 		{
 		}
 
-		public void Begin(Shader shader, uint16 viewId, Vector4 settings, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int _programIndex = 0)
+		public void Begin(Shader shader, uint16 viewId, Vector4 settings, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int _programIndex = 0, bool tesselated = false, bgfx.TextureHandle vertexTexture = .Null)
 		{
 			if (renderers.Count > 0)
 			{
@@ -65,8 +67,10 @@ namespace GameCore
 			ViewId = viewId;
 			Settings = settings;
 			Texture = null;
+			Tesselated = tesselated;
 			samplerFlags = _samplerFlags;
 			programIndex = _programIndex;
+			VertexTextureHandle = .Null;
 			if (_stateFlags != 0)
 			{
 				stateFlags = _stateFlags;
@@ -150,12 +154,12 @@ namespace GameCore
 			}
 		}
 
-		public void End()
+		public void End(Matrix4 _modelViewMatrix = .Identity)
 		{
-			Render();
+			Render(_modelViewMatrix);
 		}
 
-		private void Render()
+		private void Render(Matrix4 _modelViewMatrix = .Identity)
 		{
 			if (renderers.Count == 0)
 			{
@@ -172,7 +176,7 @@ namespace GameCore
 				instanceData[dataIndex + 3] = Texture.SpriteData[renderer.spriteIndex];
 			}
 			// Render
-			RenderManager.RenderQuads(ViewId, Matrix4.Identity, Shader, renderers.Count, &instanceData[0], dataIndex, Settings, textureScale, scope bgfx.TextureHandle[](Texture.Handle), stateFlags, samplerFlags, programIndex);
+			RenderManager.RenderMeshes(ViewId, _modelViewMatrix, Shader, renderers.Count, &instanceData[0], dataIndex, Settings, textureScale, scope bgfx.TextureHandle[](Texture.Handle, VertexTextureHandle), stateFlags, samplerFlags, programIndex, Tesselated);
 			renderers.Clear();
 			++BatchCount;
 		}

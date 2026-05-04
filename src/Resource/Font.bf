@@ -100,7 +100,7 @@ namespace GameCore
 
 		public typealias OnCharacterCallback = delegate void(int index, int lineIndex, ref Matrix4 worldMatrix, ref Color color);
 
-		public void RenderText(SpriteBatchRenderer batchRenderer, Shader shader, uint16 viewId, Vector4 settings, Matrix4 _worldMatrix, Color color, StringView text, Color outlineColor = .Opaque, int shaderProgramIndex = 0, FontFlags fontFlags = 0, OnCharacterCallback characterCallback = null)
+		public void RenderText(SpriteBatchRenderer batchRenderer, Shader shader, uint16 viewId, Vector4 settings, Matrix4 _worldMatrix, Color color, StringView text, Color outlineColor = .Opaque, int shaderProgramIndex = 0, FontFlags fontFlags = 0, OnCharacterCallback characterCallback = null, Matrix4 _modelViewMatrix = .Identity)
 		{
 			var pivot = Vector2(0.0f, -1.0f);
 			var worldMatrix = _worldMatrix;
@@ -163,7 +163,7 @@ namespace GameCore
 				batchRenderer.Add(FontTexture, fontGlyph.index, fontGlyph.size, glyphWorldMatrix, characterColor, pivot);
 				worldMatrix.Translation += Vector3.TransformNormal(.((float)fontGlyph.xAdvance, 0.0f, 0.0f), worldMatrix);
 			}
-			batchRenderer.End();
+			batchRenderer.End(_modelViewMatrix);
 		}
 
 		public Vector2 GetTextExtents(StringView text, List<float> lineExtents = null)
