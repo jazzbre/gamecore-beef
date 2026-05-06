@@ -54,8 +54,8 @@ namespace GameCore
 
 		public static RenderTexture temporaryRenderTextureWithDepth;
 
-		public static int width = 1280; // 320 * 1 + 320 / 4;
-		public static int height = 720; //180 * 1 + 180 / 4;
+		public static int width = 1280;
+		public static int height = 720;
 		public static float ooWidth, ooHeight;
 		public static var viewBounds = Bounds2();
 		public static float aspectRatio = 1.0f;
@@ -144,7 +144,7 @@ namespace GameCore
 			textureUniformHandles[0] = bgfx.create_uniform("s_texture", bgfx.UniformType.Sampler, 1);
 			for (int i = 1; i < textureUniformHandles.Count; ++i)
 			{
-				textureUniformHandles[i] = bgfx.create_uniform(scope $"s_texture{i + 1}" , bgfx.UniformType.Sampler, 1);
+				textureUniformHandles[i] = bgfx.create_uniform(scope $"s_texture{i + 1}", bgfx.UniformType.Sampler, 1);
 			}
 			colorUniformHandle = bgfx.create_uniform("s_color", bgfx.UniformType.Vec4, 1);
 			timeUniformHandle = bgfx.create_uniform("s_time", bgfx.UniformType.Vec4, 1);
