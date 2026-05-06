@@ -37,6 +37,8 @@ namespace GameCore
 
 		private Vector4 textureScale;
 
+		private Matrix4 modelViewMatrix;
+
 		public int MaxCount { get; private set; }
 
 		public Shader Shader { get; private set; }
@@ -57,7 +59,7 @@ namespace GameCore
 		{
 		}
 
-		public void Begin(Shader shader, uint16 viewId, Vector4 settings, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int _programIndex = 0, bool tesselated = false, bgfx.TextureHandle vertexTexture = .Null)
+		public void Begin(Shader shader, uint16 viewId, Vector4 settings, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int _programIndex = 0, bool tesselated = false, bgfx.TextureHandle vertexTexture = .Null, Matrix4 _modelViewMatrix = .Identity)
 		{
 			if (renderers.Count > 0)
 			{
@@ -86,11 +88,12 @@ namespace GameCore
 				samplerFlags = bgfx.SamplerFlags.MinPoint | bgfx.SamplerFlags.MagPoint | bgfx.SamplerFlags.MipPoint | bgfx.SamplerFlags.UClamp | bgfx.SamplerFlags.VClamp;
 			}
 			BatchCount = 0;
+			modelViewMatrix = _modelViewMatrix;
 		}
 
-		public void Begin(Shader shader, uint16 viewId, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int _programIndex = 0)
+		public void Begin(Shader shader, uint16 viewId, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int _programIndex = 0, Matrix4 _modelViewMatrix = .Identity)
 		{
-			Begin(shader, viewId, Settings, _stateFlags, _samplerFlags, _programIndex);
+			Begin(shader, viewId, Settings, _stateFlags, _samplerFlags, _programIndex, false, .Null, _modelViewMatrix);
 		}
 
 		public void Add(Sprite sprite, Matrix4 worldMatrix, Color color = .White, Vector2 pivot = Vector2.Zero, SpriteFlags flags = 0)
@@ -154,12 +157,12 @@ namespace GameCore
 			}
 		}
 
-		public void End(Matrix4 _modelViewMatrix = .Identity)
+		public void End()
 		{
-			Render(_modelViewMatrix);
+			Render();
 		}
 
-		private void Render(Matrix4 _modelViewMatrix = .Identity)
+		private void Render()
 		{
 			if (renderers.Count == 0)
 			{
@@ -176,7 +179,7 @@ namespace GameCore
 				instanceData[dataIndex + 3] = Texture.SpriteData[renderer.spriteIndex];
 			}
 			// Render
-			RenderManager.RenderMeshes(ViewId, _modelViewMatrix, Shader, renderers.Count, &instanceData[0], dataIndex, Settings, textureScale, scope bgfx.TextureHandle[](Texture.Handle, VertexTextureHandle), stateFlags, samplerFlags, programIndex, Tesselated);
+			RenderManager.RenderMeshes(ViewId, modelViewMatrix, Shader, renderers.Count, &instanceData[0], dataIndex, Settings, textureScale, scope bgfx.TextureHandle[](Texture.Handle, VertexTextureHandle), stateFlags, samplerFlags, programIndex, Tesselated);
 			renderers.Clear();
 			++BatchCount;
 		}

@@ -24,7 +24,8 @@ namespace GameCore
 
 		private static var debugVertices = new List<DebugVertex>() ~ delete _;
 		private static var debugTextsPool = new List<DebugText>() ~ DeleteContainerAndItems!(_);
-		private static var debugTexts = new List<DebugText>() ~ DeleteContainerAndItems!(_);
+		private static var debug2DTexts = new List<DebugText>() ~ DeleteContainerAndItems!(_);
+		private static var debug3DTexts = new List<DebugText>() ~ DeleteContainerAndItems!(_);
 
 		public static Font DebugFont { get; set; } = null;
 
@@ -61,7 +62,16 @@ namespace GameCore
 			debugText.position = position;
 			debugText.text.Set(text);
 			debugText.color = color;
-			debugTexts.Add(debugText);
+			debug3DTexts.Add(debugText);
+		}
+
+		public static void DrawText(Vector2 position, StringView text, Color color)
+		{
+			var debugText = PopDebugText();
+			debugText.position = position.xy0;
+			debugText.text.Set(text);
+			debugText.color = color;
+			debug2DTexts.Add(debugText);
 		}
 
 		public static bool Initialize()
@@ -74,7 +84,7 @@ namespace GameCore
 			return true;
 		}
 
-		private static void RenderText(uint16 viewId, DebugText debugText)
+		private static void RenderText(uint16 viewId, DebugText debugText, int shaderProgramIndex)
 		{
 			if (DebugFont == null)
 			{
@@ -83,12 +93,12 @@ namespace GameCore
 			var matrix = Matrix4.Identity;
 			var modelViewMatrix = Matrix4.Identity;
 			modelViewMatrix.Translation = debugText.position;
-			DebugFont.RenderText(RenderManager.batchRenderer, RenderManager.GetShader(.Font), viewId, .Zero, matrix, debugText.color, debugText.text, .Black, 0, .CenterX | .CenterY, null, modelViewMatrix);
+			DebugFont.RenderText(RenderManager.batchRenderer, RenderManager.GetShader(.Font), viewId, .Zero, matrix, debugText.color, debugText.text, .Black, shaderProgramIndex, 0, null, modelViewMatrix);
 		}
 
 		public static void Render(uint16 viewId, bool render = true)
 		{
-			if (!render || (debugVertices.Count == 0 && debugTexts.Count == 0))
+			if (!render || (debugVertices.Count == 0 && debug2DTexts.Count == 0))
 			{
 				Clear();
 				return;
@@ -105,20 +115,29 @@ namespace GameCore
 			bgfx.submit(viewId, shader.Programs[0], 0, (uint8)bgfx.DiscardFlags.All);
 			++RenderManager.statistics.submitCount;
 
-			for (var debugText in debugTexts)
+			for (var debugText in debug2DTexts)
 			{
-				RenderText(viewId, debugText);
+				RenderText(viewId, debugText, 0);
+			}
+			for (var debugText in debug3DTexts)
+			{
+				RenderText(viewId, debugText, 1);
 			}
 		}
 
 		public static void Clear()
 		{
 			debugVertices.Clear();
-			for (var debugText in debugTexts)
+			for (var debugText in debug2DTexts)
 			{
 				debugTextsPool.Add(debugText);
 			}
-			debugTexts.Clear();
+			debug2DTexts.Clear();
+			for (var debugText in debug3DTexts)
+			{
+				debugTextsPool.Add(debugText);
+			}
+			debug3DTexts.Clear();
 		}
 	}
 }

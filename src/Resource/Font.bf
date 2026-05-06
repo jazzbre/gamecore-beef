@@ -105,7 +105,7 @@ namespace GameCore
 			var pivot = Vector2(0.0f, -1.0f);
 			var worldMatrix = _worldMatrix;
 			var offsetY = (float)(fontData.lineHeight - fontData.baseHeight);
-			batchRenderer.Begin(shader, viewId, settings, 0, 0, shaderProgramIndex);
+			batchRenderer.Begin(shader, viewId, settings, 0, 0, shaderProgramIndex, false, .Null, _modelViewMatrix);
 			if (fontFlags != 0)
 			{
 				var extents = GetTextExtents(text);
@@ -163,7 +163,7 @@ namespace GameCore
 				batchRenderer.Add(FontTexture, fontGlyph.index, fontGlyph.size, glyphWorldMatrix, characterColor, pivot);
 				worldMatrix.Translation += Vector3.TransformNormal(.((float)fontGlyph.xAdvance, 0.0f, 0.0f), worldMatrix);
 			}
-			batchRenderer.End(_modelViewMatrix);
+			batchRenderer.End();
 		}
 
 		public Vector2 GetTextExtents(StringView text, List<float> lineExtents = null)
