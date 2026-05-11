@@ -23,6 +23,7 @@ namespace GameCore
 		private static bgfx.VertexLayout vertexLayout;
 
 		private static var debugVertices = new List<DebugVertex>() ~ delete _;
+		private static var debugSolidVertices = new List<DebugVertex>() ~ delete _;
 		private static var debugTextsPool = new List<DebugText>() ~ DeleteContainerAndItems!(_);
 		private static var debug2DTexts = new List<DebugText>() ~ DeleteContainerAndItems!(_);
 		private static var debug3DTexts = new List<DebugText>() ~ DeleteContainerAndItems!(_);
@@ -45,6 +46,14 @@ namespace GameCore
 			debugVertices.Add(DebugVertex() { position = c, color = coloruint });
 			debugVertices.Add(DebugVertex() { position = c, color = coloruint });
 			debugVertices.Add(DebugVertex() { position = a, color = coloruint });
+		}
+
+		public static void DrawSolidTriangle(Vector3 a, Vector3 b, Vector3 c, Color color)
+		{
+			var coloruint = color.ToRGBA();
+			debugSolidVertices.Add(DebugVertex() { position = a, color = coloruint });
+			debugSolidVertices.Add(DebugVertex() { position = b, color = coloruint });
+			debugSolidVertices.Add(DebugVertex() { position = c, color = coloruint });
 		}
 
 		private static DebugText PopDebugText()
@@ -103,17 +112,36 @@ namespace GameCore
 				Clear();
 				return;
 			}
-			var tvb = bgfx.TransientVertexBuffer();
+
+			let solidVerticesSize = (uint32)(debugSolidVertices.Count * sizeof(DebugVertex));
+			if (solidVerticesSize > 0)
+			{
+				var tvb = bgfx.TransientVertexBuffer();
+				bgfx.alloc_transient_vertex_buffer(&tvb, (uint32)debugSolidVertices.Count, &vertexLayout);
+				Internal.MemCpy(tvb.data, &debugSolidVertices[0], (.)solidVerticesSize);
+				var stateFlags = bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | bgfx.StateFlags.DepthTestLequal | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
+				var identity = Matrix4.Identity;
+				bgfx.set_transform(identity.Ptr(), 1);
+				bgfx.set_state((uint64)stateFlags, 0);
+				bgfx.set_transient_vertex_buffer(0, &tvb, 0, (uint32)debugSolidVertices.Count);
+				bgfx.submit(viewId, shader.Programs[0], 0, (uint8)bgfx.DiscardFlags.All);
+				++RenderManager.statistics.submitCount;
+			}
+
 			let verticesSize = (uint32)(debugVertices.Count * sizeof(DebugVertex));
-			bgfx.alloc_transient_vertex_buffer(&tvb, (uint32)debugVertices.Count, &vertexLayout);
-			Internal.MemCpy(tvb.data, &debugVertices[0], (.)verticesSize);
-			var stateFlags = bgfx.StateFlags.PtLines | bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | bgfx.StateFlags.DepthTestLequal | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
-			var identity = Matrix4.Identity;
-			bgfx.set_transform(identity.Ptr(), 1);
-			bgfx.set_state((uint64)stateFlags, 0);
-			bgfx.set_transient_vertex_buffer(0, &tvb, 0, (uint32)debugVertices.Count);
-			bgfx.submit(viewId, shader.Programs[0], 0, (uint8)bgfx.DiscardFlags.All);
-			++RenderManager.statistics.submitCount;
+			if (verticesSize > 0)
+			{
+				var tvb = bgfx.TransientVertexBuffer();
+				bgfx.alloc_transient_vertex_buffer(&tvb, (uint32)debugVertices.Count, &vertexLayout);
+				Internal.MemCpy(tvb.data, &debugVertices[0], (.)verticesSize);
+				var stateFlags = bgfx.StateFlags.PtLines | bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | bgfx.StateFlags.DepthTestLequal | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
+				var identity = Matrix4.Identity;
+				bgfx.set_transform(identity.Ptr(), 1);
+				bgfx.set_state((uint64)stateFlags, 0);
+				bgfx.set_transient_vertex_buffer(0, &tvb, 0, (uint32)debugVertices.Count);
+				bgfx.submit(viewId, shader.Programs[0], 0, (uint8)bgfx.DiscardFlags.All);
+				++RenderManager.statistics.submitCount;
+			}
 
 			for (var debugText in debug2DTexts)
 			{
@@ -128,6 +156,7 @@ namespace GameCore
 		public static void Clear()
 		{
 			debugVertices.Clear();
+			debugSolidVertices.Clear();
 			for (var debugText in debug2DTexts)
 			{
 				debugTextsPool.Add(debugText);

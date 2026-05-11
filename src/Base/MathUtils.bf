@@ -51,6 +51,36 @@ namespace System
 			return segmenta + delta * direction;
 		}
 
+
+		public static Vector3 GetNearestPointOnSegment(Vector3 segmenta, Vector3 segmentb, Vector3 point, out float delta)
+		{
+			let direction = segmentb - segmenta;
+			let lengthSquared = Vector3.Dot(direction, direction);
+
+			if (lengthSquared <= 0.00001f)
+			{
+				delta = 0.0f;
+				return segmenta;
+			}
+
+			let projection = Vector3.Dot(point - segmenta, direction);
+			delta = projection / lengthSquared;
+
+			if (delta <= 0.0f)
+			{
+				delta = 0.0f;
+				return segmenta;
+			}
+
+			if (delta >= 1.0f)
+			{
+				delta = 1.0f;
+				return segmentb;
+			}
+
+			return segmenta + delta * direction;
+		}
+
 		public static bool SegmentSegmentIntersection(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4, out Vector2 intersection, float epsilon = 0.0f)
 		{
 			// Get the segments' parameters.

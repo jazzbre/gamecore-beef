@@ -77,6 +77,14 @@ namespace GameCore
 			this.v.m33 = m33;
 		}
 
+		public this(Vector4 rowX, Vector4 rowY, Vector4 rowZ, Vector4 rowW)
+		{
+			r.RowX = rowX;
+			r.RowY = rowY;
+			r.RowZ = rowZ;
+			r.RowW = rowW;
+		}
+
 		public void* Ptr() mut { return &v.m00; }
 
 		public Vector3 Right

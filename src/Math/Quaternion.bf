@@ -149,87 +149,69 @@ namespace GameCore
 
 		public static Quaternion CreateFromRotationMatrix(Matrix4 matrix)
 		{
-			float num8 = (matrix.v.m11 + matrix.v.m22) + matrix.v.m33;
-			Quaternion quaternion = Quaternion();
-			if (num8 > 0f)
-			{
-				float num = (float)Math.Sqrt((double)(num8 + 1f));
-				quaternion.w = num * 0.5f;
-				num = 0.5f / num;
-				quaternion.x = (matrix.v.m23 - matrix.v.m32) * num;
-				quaternion.y = (matrix.v.m31 - matrix.v.m13) * num;
-				quaternion.z = (matrix.v.m12 - matrix.v.m21) * num;
-				return quaternion;
-			}
-			if ((matrix.v.m11 >= matrix.v.m22) && (matrix.v.m11 >= matrix.v.m33))
-			{
-				float num7 = (float)Math.Sqrt((double)(((1f + matrix.v.m11) - matrix.v.m22) - matrix.v.m33));
-				float num4 = 0.5f / num7;
-				quaternion.x = 0.5f * num7;
-				quaternion.y = (matrix.v.m12 + matrix.v.m21) * num4;
-				quaternion.z = (matrix.v.m13 + matrix.v.m31) * num4;
-				quaternion.w = (matrix.v.m23 - matrix.v.m32) * num4;
-				return quaternion;
-			}
-			if (matrix.v.m22 > matrix.v.m33)
-			{
-				float num6 = (float)Math.Sqrt((double)(((1f + matrix.v.m22) - matrix.v.m11) - matrix.v.m33));
-				float num3 = 0.5f / num6;
-				quaternion.x = (matrix.v.m21 + matrix.v.m12) * num3;
-				quaternion.y = 0.5f * num6;
-				quaternion.z = (matrix.v.m32 + matrix.v.m23) * num3;
-				quaternion.w = (matrix.v.m31 - matrix.v.m13) * num3;
-				return quaternion;
-			}
-			float num5 = (float)Math.Sqrt((double)(((1f + matrix.v.m33) - matrix.v.m11) - matrix.v.m22));
-			float num2 = 0.5f / num5;
-			quaternion.x = (matrix.v.m31 + matrix.v.m13) * num2;
-			quaternion.y = (matrix.v.m32 + matrix.v.m23) * num2;
-			quaternion.z = 0.5f * num5;
-			quaternion.w = (matrix.v.m12 - matrix.v.m21) * num2;
+			float m00 = matrix.v.m00;
+			float m01 = matrix.v.m01;
+			float m02 = matrix.v.m02;
 
-			return quaternion;
+			float m10 = matrix.v.m10;
+			float m11 = matrix.v.m11;
+			float m12 = matrix.v.m12;
+
+			float m20 = matrix.v.m20;
+			float m21 = matrix.v.m21;
+			float m22 = matrix.v.m22;
+
+			Quaternion q = Quaternion();
+
+			float trace = m00 + m11 + m22;
+
+			if (trace > 0.0f)
+			{
+				float s = (float)Math.Sqrt((double)(trace + 1.0f));
+				q.w = s * 0.5f;
+
+				float invS = 0.5f / s;
+				q.x = (m21 - m12) * invS;
+				q.y = (m02 - m20) * invS;
+				q.z = (m10 - m01) * invS;
+			}
+			else if ((m00 >= m11) && (m00 >= m22))
+			{
+				float s = (float)Math.Sqrt((double)(1.0f + m00 - m11 - m22));
+				float invS = 0.5f / s;
+
+				q.x = s * 0.5f;
+				q.y = (m01 + m10) * invS;
+				q.z = (m02 + m20) * invS;
+				q.w = (m21 - m12) * invS;
+			}
+			else if (m11 > m22)
+			{
+				float s = (float)Math.Sqrt((double)(1.0f + m11 - m00 - m22));
+				float invS = 0.5f / s;
+
+				q.x = (m10 + m01) * invS;
+				q.y = s * 0.5f;
+				q.z = (m21 + m12) * invS;
+				q.w = (m02 - m20) * invS;
+			}
+			else
+			{
+				float s = (float)Math.Sqrt((double)(1.0f + m22 - m00 - m11));
+				float invS = 0.5f / s;
+
+				q.x = (m20 + m02) * invS;
+				q.y = (m21 + m12) * invS;
+				q.z = s * 0.5f;
+				q.w = (m10 - m01) * invS;
+			}
+
+			return q;
 		}
 
 		public static void CreateFromRotationMatrix(ref Matrix4 matrix, out Quaternion result)
 		{
-			float num8 = (matrix.v.m11 + matrix.v.m22) + matrix.v.m33;
-			if (num8 > 0f)
-			{
-				float num = (float)Math.Sqrt((double)(num8 + 1f));
-				result.w = num * 0.5f;
-				num = 0.5f / num;
-				result.x = (matrix.v.m23 - matrix.v.m32) * num;
-				result.y = (matrix.v.m31 - matrix.v.m13) * num;
-				result.z = (matrix.v.m12 - matrix.v.m21) * num;
-			}
-			else if ((matrix.v.m11 >= matrix.v.m22) && (matrix.v.m11 >= matrix.v.m33))
-			{
-				float num7 = (float)Math.Sqrt((double)(((1f + matrix.v.m11) - matrix.v.m22) - matrix.v.m33));
-				float num4 = 0.5f / num7;
-				result.x = 0.5f * num7;
-				result.y = (matrix.v.m12 + matrix.v.m21) * num4;
-				result.z = (matrix.v.m13 + matrix.v.m31) * num4;
-				result.w = (matrix.v.m23 - matrix.v.m32) * num4;
-			}
-			else if (matrix.v.m22 > matrix.v.m33)
-			{
-				float num6 = (float)Math.Sqrt((double)(((1f + matrix.v.m22) - matrix.v.m11) - matrix.v.m33));
-				float num3 = 0.5f / num6;
-				result.x = (matrix.v.m21 + matrix.v.m12) * num3;
-				result.y = 0.5f * num6;
-				result.z = (matrix.v.m32 + matrix.v.m23) * num3;
-				result.w = (matrix.v.m31 - matrix.v.m13) * num3;
-			}
-			else
-			{
-				float num5 = (float)Math.Sqrt((double)(((1f + matrix.v.m33) - matrix.v.m11) - matrix.v.m22));
-				float num2 = 0.5f / num5;
-				result.x = (matrix.v.m31 + matrix.v.m13) * num2;
-				result.y = (matrix.v.m32 + matrix.v.m23) * num2;
-				result.z = 0.5f * num5;
-				result.w = (matrix.v.m12 - matrix.v.m21) * num2;
-			}
+			result = CreateFromRotationMatrix(matrix);
 		}
 
 		public static Quaternion CreateFromYawPitchRoll(float yaw, float pitch, float roll)
