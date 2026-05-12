@@ -28,8 +28,8 @@ namespace GameCore
 		public const Vector4 Down = Vector4(0f, -1f, 0f, 0.0f);
 		public const Vector4 Right = Vector4(1f, 0f, 0f, 0.0f);
 		public const Vector4 Left = Vector4(-1f, 0f, 0f, 0.0f);
-		public const Vector4 Forward = Vector4(0f, 0f, -1f, 0.0f);
-		public const Vector4 Backward = Vector4(0f, 0f, 1f, 0.0f);
+		public const Vector4 Forward = Vector4(0f, 0f, 1f, 0.0f);
+		public const Vector4 Backward = Vector4(0f, 0f, -1f, 0.0f);
 
 		public float* f mut => &x;
 

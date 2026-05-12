@@ -25,8 +25,8 @@ namespace GameCore
 		public const Vector3 Down = Vector3(0f, -1f, 0f);
 		public const Vector3 Right = Vector3(1f, 0f, 0f);
 		public const Vector3 Left = Vector3(-1f, 0f, 0f);
-		public const Vector3 Forward = Vector3(0f, 0f, -1f);
-		public const Vector3 Backward = Vector3(0f, 0f, 1f);
+		public const Vector3 Forward = Vector3(0f, 0f, 1f);
+		public const Vector3 Backward = Vector3(0f, 0f, -1f);
 
 		public float* f mut => &x;
 
