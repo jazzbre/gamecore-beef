@@ -151,6 +151,7 @@ namespace GameCore
 			{
 				RenderText(viewId, debugText, 1);
 			}
+			Clear();
 		}
 
 		public static void Clear()
