@@ -104,6 +104,13 @@ namespace GameCore
 
 		public static void Finalize()
 		{
+			buildResourceLock.Enter();
+			for (var fileName in queueResourceFiles)
+			{
+				delete fileName;
+			}
+			queueResourceFiles.Clear();
+			buildResourceLock.Exit();
 			DestroyResources();
 		}
 

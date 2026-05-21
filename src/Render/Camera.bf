@@ -13,12 +13,14 @@ namespace GameCore
 		public float nearPlane = 0.01f;
 		public float farPlane = 1000.0f;
 
+		public Matrix4 worldMatrix = .Identity;
 		public Matrix4 viewMatrix = .Identity;
 		public Matrix4 projectionMatrix = .Identity;
 
 		public void UpdateMatrices(float aspectRatio)
 		{
-			viewMatrix = Matrix4.Inverse(Matrix4.CreateTransform(position, .One, rotation));
+			worldMatrix = Matrix4.CreateTransform(position, .One, rotation);
+			viewMatrix = Matrix4.Inverse(worldMatrix);
 			projectionMatrix = Matrix4.CreatePerspectiveFOV(fov * (float)Math.DegreeToRadian, aspectRatio, nearPlane, farPlane);
 		}
 	}

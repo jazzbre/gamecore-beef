@@ -396,6 +396,8 @@ namespace ImGui
 
 		typealias InputPropertyDelegate<T> = delegate void(ref T);
 		typealias InputPropertyCheckDelegate<T> = delegate bool(ref T);
+		typealias InputPropertyGUIRefDelegate<T> = delegate void(ref T, bool);
+		typealias InputPropertyGUIDelegate<T> = delegate void(T, bool);
 
 		public static bool InputList<T>(StringView name, List<T> list, InputPropertyDelegate<T> inputProperty, ImGuiListFlags flags = .DefaultMask, bool sameLine = false, InputPropertyCheckDelegate<T> inputCheckProperty = null) where T : ValueType
 		{
@@ -558,19 +560,19 @@ namespace ImGui
 			return deleted;
 		}
 
-		public static void InputList<T>(StringView name, List<T> list, ImGuiListFlags flags = .DefaultMask) where T : var
+		public static void InputList<T>(StringView name, List<T> list, ImGuiListFlags flags = .DefaultMask, InputPropertyGUIRefDelegate<T> guiDelegate = null) where T : var
 		{
-			InputList(name, list, scope [&] (t) => InputProperty("", ref t), flags);
+			InputList(name, list, scope [&] (t) => { bool result = InputProperty("", ref t); if (guiDelegate != null) guiDelegate(ref t, result); }, flags);
 		}
 
-		public static void InputList<T>(StringView name, List<T> list, ImGuiListFlags flags = .DefaultMask) where T : ValueType
+		public static void InputList<T>(StringView name, List<T> list, ImGuiListFlags flags = .DefaultMask, InputPropertyGUIRefDelegate<T> guiDelegate = null) where T : ValueType
 		{
-			InputList(name, list, scope [&] (t) => InputProperty("", ref t), flags);
+			InputList(name, list, scope [&] (t) => { bool result = InputProperty("", ref t); if (guiDelegate != null) guiDelegate(ref t, result); }, flags);
 		}
 
-		public static void InputList<T>(StringView name, List<T> list, ImGuiListFlags flags = .DefaultMask) where T : Object, new, delete
+		public static void InputList<T>(StringView name, List<T> list, ImGuiListFlags flags = .DefaultMask, InputPropertyGUIDelegate<T> guiDelegate = null) where T : Object, new, delete
 		{
-			InputList(name, list, scope [&] (t) => InputProperty("", t), flags);
+			InputList(name, list, scope [&] (t) => { bool result = InputProperty("", t); if (guiDelegate != null) guiDelegate(t, result); }, flags);
 		}
 
 		public static bool InputSprite(StringView name, ref Sprite sprite)
