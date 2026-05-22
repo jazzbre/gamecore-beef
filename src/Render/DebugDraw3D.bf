@@ -21,12 +21,17 @@ namespace GameCore
 
 		private static Shader shader;
 		private static bgfx.VertexLayout vertexLayout;
+		private static bgfx.VertexLayout cubeVertexLayout;
 
 		private static var debugVertices = new List<DebugVertex>() ~ delete _;
 		private static var debugSolidVertices = new List<DebugVertex>() ~ delete _;
+		private static var debugCubes = new List<Vector4>() ~ delete _;
 		private static var debugTextsPool = new List<DebugText>() ~ DeleteContainerAndItems!(_);
 		private static var debug2DTexts = new List<DebugText>() ~ DeleteContainerAndItems!(_);
 		private static var debug3DTexts = new List<DebugText>() ~ DeleteContainerAndItems!(_);
+
+		private static bgfx.VertexBufferHandle cube_vertex_buffer_handle = .Null;
+		private static bgfx.IndexBufferHandle huge_index_buffer = .Null;
 
 		public static Font DebugFont { get; set; } = null;
 
@@ -128,6 +133,14 @@ namespace GameCore
 			DrawBox(worldMatrix, halfExtents, color);
 		}
 
+		public static void DrawCube(Vector3 center, float size, Color color)
+		{
+			Vector4 p = center.xyz0;
+			p.w = size;
+			debugCubes.Add(p);
+			debugCubes.Add(color.xyzw);
+		}
+
 		private static void DrawRing(Vector3 center, float radius, Vector3 axisA, Vector3 axisB, Color color, int32 segments)
 		{
 			float angleStep = Math.PI_f * 2.0f / (float)segments;
@@ -191,6 +204,8 @@ namespace GameCore
 			debug2DTexts.Add(debugText);
 		}
 
+		static uint32 NUM_CUBE_INDICES = 3 * 3 * 2;
+
 		public static bool Initialize()
 		{
 			shader = ResourceManager.GetResource<Shader>("shaders/debug_draw3d");
@@ -198,6 +213,32 @@ namespace GameCore
 			bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.Position, 3, bgfx.AttribType.Float, false, false);
 			bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.TexCoord0, 4, bgfx.AttribType.Uint8, true, false);
 			bgfx.vertex_layout_end(&vertexLayout);
+
+			bgfx.vertex_layout_begin(&cubeVertexLayout, bgfx.get_renderer_type());
+			bgfx.vertex_layout_add(&cubeVertexLayout, bgfx.Attrib.Position, 4, bgfx.AttribType.Float, false, false);
+			bgfx.vertex_layout_end(&cubeVertexLayout);
+
+			uint32 num_instances  = 64 * 64 * 64;
+
+			let cube_indices = scope uint32[](
+				0, 2, 1, 2, 3, 1,
+				5, 4, 1, 1, 4, 0,
+				0, 4, 6, 0, 6, 2,
+				6, 5, 7, 6, 4, 5,
+				2, 6, 3, 6, 7, 3,
+				7, 1, 3, 7, 5, 1
+				);
+			uint32 NUM_CUBE_VERTICES = 8;
+			uint32 num_indices  = num_instances  * NUM_CUBE_INDICES;
+			var indices = new uint32[num_indices];
+			defer delete indices;
+			for (uint32 i = 0; i < num_indices; ++i)
+			{
+				let cube = i / NUM_CUBE_INDICES;
+				let cube_local = i % NUM_CUBE_INDICES;
+				indices[i] = cube_indices[cube_local] + cube * NUM_CUBE_VERTICES;
+			}
+			huge_index_buffer = bgfx.create_index_buffer(bgfx.copy(&indices[0], (uint32)(indices.Count * sizeof(uint32))), (uint16)bgfx.BufferFlags.Index32);
 			return true;
 		}
 
@@ -215,7 +256,7 @@ namespace GameCore
 
 		public static void Render(uint16 viewId, bool render = true)
 		{
-			if (!render || (debugVertices.Count == 0 && debug2DTexts.Count == 0 && debugSolidVertices.Count == 0))
+			if (!render || (debugVertices.Count == 0 && debug2DTexts.Count == 0 && debugSolidVertices.Count == 0 && debugCubes.Count == 0))
 			{
 				Clear();
 				return;
@@ -251,6 +292,26 @@ namespace GameCore
 				++RenderManager.statistics.submitCount;
 			}
 
+			let cubeVerticesSize = (uint32)(debugCubes.Count * sizeof(Vector4));
+			if (cubeVerticesSize > 0)
+			{
+				if (cube_vertex_buffer_handle.Valid)
+				{
+					bgfx.destroy_vertex_buffer(cube_vertex_buffer_handle);
+				}
+				cube_vertex_buffer_handle = bgfx.create_vertex_buffer(bgfx.copy(&debugCubes[0], (.)cubeVerticesSize), &cubeVertexLayout, (uint16)bgfx.BufferFlags.ComputeRead);
+				var stateFlags = bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | bgfx.StateFlags.DepthTestLequal | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
+				var identity = Matrix4.Identity;
+				bgfx.set_transform(identity.Ptr(), 1);
+				bgfx.set_state((uint64)stateFlags, 0);
+				bgfx.set_compute_vertex_buffer(0, cube_vertex_buffer_handle, bgfx.Access.Read);
+				uint32 instanceCount = ((uint32)debugCubes.Count / 2);
+				bgfx.set_index_buffer(huge_index_buffer, 0, instanceCount * NUM_CUBE_INDICES);
+				bgfx.set_vertex_count(instanceCount * 8);
+				bgfx.submit(viewId, shader.Programs[1], 0, (uint8)bgfx.DiscardFlags.All);
+				++RenderManager.statistics.submitCount;
+			}
+
 			for (var debugText in debug2DTexts)
 			{
 				RenderText(viewId, debugText, 0);
@@ -266,6 +327,7 @@ namespace GameCore
 		{
 			debugVertices.Clear();
 			debugSolidVertices.Clear();
+			debugCubes.Clear();
 			for (var debugText in debug2DTexts)
 			{
 				debugTextsPool.Add(debugText);
