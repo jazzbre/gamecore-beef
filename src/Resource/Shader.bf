@@ -52,14 +52,22 @@ namespace GameCore
 				var vsHandle = bgfx.create_shader(vsMemory);
 
 				int32 fsSize = binaryFile.Read<int32>().Value;
-				data.Count = fsSize;
-				binaryFile.TryRead(Span<uint8>(data.Ptr, fsSize));
+				if (fsSize == 0)
+				{
+					var handle = bgfx.create_compute_program(vsHandle, true);
+					Programs.Add(handle);
+				}
+				else
+				{
+					data.Count = fsSize;
+					binaryFile.TryRead(Span<uint8>(data.Ptr, fsSize));
 
-				var fsMemory = bgfx.copy(data.Ptr, (uint32)fsSize);
-				var fsHandle = bgfx.create_shader(fsMemory);
+					var fsMemory = bgfx.copy(data.Ptr, (uint32)fsSize);
+					var fsHandle = bgfx.create_shader(fsMemory);
 
-				var handle = bgfx.create_program(vsHandle, fsHandle, true);
-				Programs.Add(handle);
+					var handle = bgfx.create_program(vsHandle, fsHandle, true);
+					Programs.Add(handle);
+				}
 			}
 		}
 

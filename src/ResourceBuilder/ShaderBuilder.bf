@@ -14,12 +14,14 @@ namespace GameCore
 			public bgfx.RendererType rendererType;
 			public String vsFlags = new String() ~ delete _;
 			public String fsFlags = new String() ~ delete _;
+			public String csFlags = new String() ~ delete _;
 
-			public this(bgfx.RendererType _rendererType, char8* _vsFlags, char8* _fsFlags)
+			public this(bgfx.RendererType _rendererType, char8* _vsFlags, char8* _fsFlags, char8* _csFlags)
 			{
 				rendererType = _rendererType;
 				vsFlags.Set(StringView(_vsFlags));
 				fsFlags.Set(StringView(_fsFlags));
+				csFlags.Set(StringView(_csFlags));
 			}
 		}
 
@@ -34,28 +36,23 @@ namespace GameCore
 			}
 		}
 		private static var platformSettings = new PlatformSettings[(int)ResourceBuilderPlatform.Last]
-			(
-			// Windows
+			( // Windows
 			new PlatformSettings(
-			new RendererSettings(.Direct3D11, "--platform windows --profile vs_4_0 -O 3", "--platform windows --profile ps_4_0 -O 3"),
-			new RendererSettings(.OpenGL, "--platform windows -O 3", "--platform windows -O 3"),
-			new RendererSettings(.Vulkan, "--platform linux -p spirv", "--platform linux -p spirv")),
-			// Linux
+			new RendererSettings(.Direct3D11, "--platform windows --profile vs_4_0 -O 3", "--platform windows --profile ps_4_0 -O 3", "-platform windows --profile cs_5_0 -O 3"),
+			new RendererSettings(.OpenGL, "--platform windows -O 3", "--platform windows -O 3", "--platform linux -p 430 -O 3"),
+			new RendererSettings(.Vulkan, "--platform linux -p spirv", "--platform linux -p spirv", "--platform linux -p spirv")),
 			new PlatformSettings(
-			new RendererSettings(.OpenGL, "--platform linux -O 3", "--platform linux -O 3"),
-			new RendererSettings(.Vulkan, "--platform linux -p spirv", "--platform linux -p spirv")),
-			// macOS
+			new RendererSettings(.OpenGL, "--platform linux -O 3", "--platform linux -O 3", "--platform linux -p 430 -O 3"),
+			new RendererSettings(.Vulkan, "--platform linux -p spirv", "--platform linux -p spirv", "--platform linux -p spirv")), // Linux
 			new PlatformSettings(
-			new RendererSettings(.Metal, "--platform osx -p metal -O 3", "--platform osx -p metal -O 3"),
-			new RendererSettings(.OpenGL, "--platform osx -O 3", "--platform osx -O 3")),
-			// iOS
+			new RendererSettings(.Metal, "--platform osx -p metal -O 3", "--platform osx -p metal -O 3", "--platform osx -p metal -O 3"),
+			new RendererSettings(.OpenGL, "--platform osx -O 3", "--platform osx -O 3", "--platform linux -p 430 -O 3")), // macOS
 			new PlatformSettings(
-			new RendererSettings(.Metal, "--platform ios -p metal -O 3", "--platform ios -p metal -O 3"),
-			new RendererSettings(.OpenGLES, "--platform ios -O 3", "--platform ios -O 3")),
-			// Android
+			new RendererSettings(.Metal, "--platform ios -p metal -O 3", "--platform ios -p metal -O 3", "--platform ios -p metal -O 3"),
+			new RendererSettings(.OpenGLES, "--platform ios -O 3", "--platform ios -O 3", "--platform linux -p 430 -O 3")), // iOS
 			new PlatformSettings(
-			new RendererSettings(.OpenGLES, "--platform android -O 3", "--platform android -O 3"),
-			new RendererSettings(.Vulkan, "--platform linux -p spirv", "--platform linux -p spirv")),
+			new RendererSettings(.OpenGLES, "--platform android -O 3", "--platform android -O 3", "--platform linux -p 430 -O 3"), // Android
+			new RendererSettings(.Vulkan, "--platform linux -p spirv", "--platform linux -p spirv", "--platform linux -p spirv"))
 			) ~ DeleteContainerAndItems!(_);
 #endif
 
@@ -89,9 +86,10 @@ namespace GameCore
 			while (true)
 			{
 				var success = true;
-				for(var rendererSetting in platformSetting.rendererSettings) {
-				var binaryPath = scope String()..Set(scope $"{ResourceManager.runtimeResourcesPath}{hash}.{rendererSetting.rendererType}.shader");
-					// Open output file
+				for (var rendererSetting in platformSetting.rendererSettings)
+				{
+					var binaryPath = scope String()..Set(scope $"{ResourceManager.runtimeResourcesPath}{hash}.{rendererSetting.rendererType}.shader");
+						// Open output file
 					var binaryFile = scope FileStream();
 					switch (binaryFile.Create(binaryPath, .Write)) {
 					case .Ok:
@@ -99,7 +97,7 @@ namespace GameCore
 					case .Err:
 						return false;
 					}
-					// Read shader
+						// Read shader
 					var text = scope String();
 					switch (File.ReadAllText(path, text)) {
 					case .Ok(let val):
@@ -111,14 +109,16 @@ namespace GameCore
 					var vertexShaderPartIndex = text.IndexOf("[VS]");
 					var varyingPartIndex = text.IndexOf("[VAR]");
 					var fragmentShaderPartIndex = text.IndexOf("[FS]");
-					// Parse defines
+					var computeShaderPartIndex = text.IndexOf("[CS]");
+						// Parse defines
 					var defineNames = scope List<String>();
 					defer ClearAndDeleteItems(defineNames);
 					var defines = scope List<String>();
 					defer ClearAndDeleteItems(defines);
 					if (definePartIndex != -1)
 					{
-						var definePart = scope String(text, definePartIndex + 5, vertexShaderPartIndex - (definePartIndex + 5));
+						int partIndex = Math.Max(vertexShaderPartIndex, computeShaderPartIndex);
+						var definePart = scope String(text, definePartIndex + 5, partIndex - (definePartIndex + 5));
 						definePart.Replace(" ", "");
 						var buffer = scope String();
 						var name = scope String();
@@ -168,55 +168,49 @@ namespace GameCore
 						defines.Add(new String());
 						defineNames.Add(new String());
 					}
-					// Parse vertex shader
-					if (vertexShaderPartIndex == -1)
+
+						// Parse compute shader
+					if (computeShaderPartIndex == -1)
 					{
-						var temp = scope String();
-						temp.AppendF("{0} [VS] vertex shader not found!", path);
-						if (SystemUtils.ShowMessageBoxOKCancel("Shader Compile", temp) == 1)
+							// Parse vertex shader
+						if (vertexShaderPartIndex == -1)
 						{
-							System.Environment.Exit(1);
+							var temp = scope String();
+							temp.AppendF("{0} [VS] vertex shader not found!", path);
+							if (SystemUtils.ShowMessageBoxOKCancel("Shader Compile", temp) == 1)
+							{
+								System.Environment.Exit(1);
+							}
+							continue;
 						}
-						continue;
-					}
-					// Parse varying
-					if (varyingPartIndex == -1)
-					{
-						var temp = scope String();
-						temp.AppendF("{0} [VAR] varying not found!", path);
-						if (SystemUtils.ShowMessageBoxOKCancel("Shader Compile", temp) == 1)
+							// Parse varying
+						if (varyingPartIndex == -1)
 						{
-							System.Environment.Exit(1);
+							var temp = scope String();
+							temp.AppendF("{0} [VAR] varying not found!", path);
+							if (SystemUtils.ShowMessageBoxOKCancel("Shader Compile", temp) == 1)
+							{
+								System.Environment.Exit(1);
+							}
+							continue;
 						}
-						continue;
-					}
-					// Parse fragment shader
-					if (fragmentShaderPartIndex == -1)
-					{
-						var temp = scope String();
-						temp.AppendF("{0} [FS] fragment shader not found!", path);
-						if (SystemUtils.ShowMessageBoxOKCancel("Shader Compile", temp) == 1)
+							// Parse fragment shader
+						if (fragmentShaderPartIndex == -1)
 						{
-							System.Environment.Exit(1);
+							var temp = scope String();
+							temp.AppendF("{0} [FS] fragment shader not found!", path);
+							if (SystemUtils.ShowMessageBoxOKCancel("Shader Compile", temp) == 1)
+							{
+								System.Environment.Exit(1);
+							}
+							continue;
 						}
-						continue;
 					}
 					binaryFile.Write((int32)defines.Count).IgnoreError();
 					for (var defineIndex = 0; defineIndex < defines.Count; ++defineIndex)
 					{
+						// Common setup
 						var define = defines[defineIndex];
-						var vsPath = scope String()..AppendF("{}{}.vs", ResourceManager.runtimeResourcesPath, hash);
-						var vsTextPart = scope String(text, vertexShaderPartIndex + 4, varyingPartIndex - (vertexShaderPartIndex + 4));
-						File.WriteAllText(vsPath, vsTextPart);
-						var varPath = scope String()..AppendF("{}{}.var", ResourceManager.runtimeResourcesPath, hash);
-						var varTextPart = scope String(text, varyingPartIndex + 5, fragmentShaderPartIndex - (varyingPartIndex + 5));
-						File.WriteAllText(varPath, varTextPart);
-						var fsPath = scope String()..AppendF("{}{}.fs", ResourceManager.runtimeResourcesPath, hash);
-						var fsTextPart = scope String(text, fragmentShaderPartIndex + 4, text.Length - (fragmentShaderPartIndex + 4));
-						File.WriteAllText(fsPath, fsTextPart);
-						var vsBinaryPath = scope $"{vsPath}.bin";
-						var fsBinaryPath = scope $"{fsPath}.bin";
-						// Build
 						var toolPath = scope String();
 						toolPath.Set(ResourceManager.buildtimeBgfxToolsPath);
 						toolPath.Append("shadercrelease");
@@ -227,63 +221,118 @@ namespace GameCore
 						Path.GetDirectoryPath(path, localIncludePath);
 						var commandLine = scope String();
 						commandLine.Clear();
-						commandLine.AppendF("-f \"{0}\" -o \"{1}\" --type Vertex --varyingdef \"{2}\" -i \"{3}\" -i \"{4}\" {5} --define {6}", vsPath, vsBinaryPath, varPath, includePath, localIncludePath, StringView(rendererSetting.vsFlags), define);
-						// Build vertex shader
-						var output = scope String();
-						var outputError = scope String();
-						if (SystemUtils.ExecuteProcess(toolPath, commandLine, output, outputError) != 0)
+						if (vertexShaderPartIndex != -1)
 						{
-							if (SystemUtils.ShowMessageBoxOKCancel("Shader Compile", scope $"'{path}' vertex shader compile defines:'{define}'' failed!\n{output}\n{outputError}") == 1)
+							var vsPath = scope String()..AppendF("{}{}.vs", ResourceManager.runtimeResourcesPath, hash);
+							var vsTextPart = scope String(text, vertexShaderPartIndex + 4, varyingPartIndex - (vertexShaderPartIndex + 4));
+							File.WriteAllText(vsPath, vsTextPart);
+							var varPath = scope String()..AppendF("{}{}.var", ResourceManager.runtimeResourcesPath, hash);
+							var varTextPart = scope String(text, varyingPartIndex + 5, fragmentShaderPartIndex - (varyingPartIndex + 5));
+							File.WriteAllText(varPath, varTextPart);
+							var fsPath = scope String()..AppendF("{}{}.fs", ResourceManager.runtimeResourcesPath, hash);
+							var fsTextPart = scope String(text, fragmentShaderPartIndex + 4, text.Length - (fragmentShaderPartIndex + 4));
+							File.WriteAllText(fsPath, fsTextPart);
+							var vsBinaryPath = scope $"{vsPath}.bin";
+							var fsBinaryPath = scope $"{fsPath}.bin";
+							// Build
+							commandLine.AppendF("-f \"{0}\" -o \"{1}\" --type Vertex --varyingdef \"{2}\" -i \"{3}\" -i \"{4}\" {5} --define {6}", vsPath, vsBinaryPath, varPath, includePath, localIncludePath, StringView(rendererSetting.vsFlags), define);
+							// Build vertex shader
+							var output = scope String();
+							var outputError = scope String();
+							if (SystemUtils.ExecuteProcess(toolPath, commandLine, output, outputError) != 0)
 							{
-								System.Environment.Exit(1);
+								if (SystemUtils.ShowMessageBoxOKCancel("Shader Compile", scope $"'{path}' vertex shader compile defines:'{define}'' failed!\n{output}\n{outputError}") == 1)
+								{
+									System.Environment.Exit(1);
+								}
+								success = false;
+								break;
 							}
-							success = false;
-							break;
+							Log.Info(output);
+							commandLine.Clear();
+							commandLine.AppendF("-f \"{0}\" -o \"{1}\" --type Fragment --varyingdef \"{2}\" -i \"{3}\" -i \"{4}\" {5} --define {6}", fsPath, fsBinaryPath, varPath, includePath, localIncludePath, StringView(rendererSetting.fsFlags), define);
+							// Build fragment shader
+							if (SystemUtils.ExecuteProcess(toolPath, commandLine, output, outputError) != 0)
+							{
+								if (SystemUtils.ShowMessageBoxOKCancel("Shader Compile", scope $"'{path}' fragment shader compile defines:'{define}'' failed!\n{output}\n{outputError}") == 1)
+								{
+									System.Environment.Exit(1);
+								}
+								success = false;
+								break;
+							}
+							Log.Info(output);
+							File.Delete(vsPath);
+							File.Delete(varPath);
+							File.Delete(fsPath);
+							if (success)
+							{
+								// Read binary files
+								uint8[] vsBinaryData = null;
+								if (!SystemUtils.ReadBinaryFile(vsBinaryPath, out vsBinaryData))
+								{
+									SystemUtils.ShowMessageBoxOKCancel("Shader Compile", scope $"'{vsBinaryPath}' vertex shader binary failed!");
+									System.Environment.Exit(1);
+								}
+								uint8[] fsBinaryData = null;
+								if (!SystemUtils.ReadBinaryFile(fsBinaryPath, out fsBinaryData))
+								{
+									SystemUtils.ShowMessageBoxOKCancel("Shader Compile", scope $"'{fsBinaryPath}' fragment shader binary failed!");
+									System.Environment.Exit(1);
+								}
+								binaryFile.WriteStrSized32(defineNames[defineIndex]).IgnoreError();
+								binaryFile.Write((int32)vsBinaryData.Count);
+								binaryFile.TryWrite(Span<uint8>(vsBinaryData, 0, vsBinaryData.Count));
+								binaryFile.Write((int32)fsBinaryData.Count);
+								binaryFile.TryWrite(Span<uint8>(fsBinaryData, 0, fsBinaryData.Count));
+								delete vsBinaryData;
+								delete fsBinaryData;
+							}
+							File.Delete(vsBinaryPath);
+							File.Delete(fsBinaryPath);
 						}
-						Log.Info(output);
-						commandLine.Clear();
-						commandLine.AppendF("-f \"{0}\" -o \"{1}\" --type Fragment --varyingdef \"{2}\" -i \"{3}\" -i \"{4}\" {5} --define {6}", fsPath, fsBinaryPath, varPath, includePath, localIncludePath, StringView(rendererSetting.fsFlags), define);
-						// Build fragment shader
-						if (SystemUtils.ExecuteProcess(toolPath, commandLine, output, outputError) != 0)
+						else
 						{
-							if (SystemUtils.ShowMessageBoxOKCancel("Shader Compile", scope $"'{path}' fragment shader compile defines:'{define}'' failed!\n{output}\n{outputError}") == 1)
+							var csPath = scope String()..AppendF("{}{}.cs", ResourceManager.runtimeResourcesPath, hash);
+							var csTextPart = scope String(text, computeShaderPartIndex + 4,  text.Length - (computeShaderPartIndex + 4));
+							File.WriteAllText(csPath, csTextPart);
+							var csBinaryPath = scope $"{csPath}.bin";
+							// Build
+							commandLine.AppendF("-f \"{0}\" -o \"{1}\" --type Compute -i \"{2}\" -i \"{3}\" {4} --define {5}", csPath, csBinaryPath, includePath, localIncludePath, StringView(rendererSetting.csFlags), define);
+							// Build vertex shader
+							var output = scope String();
+							var outputError = scope String();
+							if (SystemUtils.ExecuteProcess(toolPath, commandLine, output, outputError) != 0)
 							{
-								System.Environment.Exit(1);
+								if (SystemUtils.ShowMessageBoxOKCancel("Shader Compile", scope $"'{path}' compute shader compile defines:'{define}'' failed!\n{output}\n{outputError}") == 1)
+								{
+									System.Environment.Exit(1);
+								}
+								success = false;
+								break;
 							}
-							success = false;
-							break;
+							Log.Info(output);
+							File.Delete(csPath);
+							if (success)
+							{
+								// Read binary files
+								uint8[] vsBinaryData = null;
+								if (!SystemUtils.ReadBinaryFile(csBinaryPath, out vsBinaryData))
+								{
+									SystemUtils.ShowMessageBoxOKCancel("Shader Compile", scope $"'{csBinaryPath}' compute shader binary failed!");
+									System.Environment.Exit(1);
+								}
+								binaryFile.WriteStrSized32(defineNames[defineIndex]).IgnoreError();
+								binaryFile.Write((int32)vsBinaryData.Count);
+								binaryFile.TryWrite(Span<uint8>(vsBinaryData, 0, vsBinaryData.Count));
+								binaryFile.Write((int32)0);
+								delete vsBinaryData;
+							}
+							File.Delete(csBinaryPath);
 						}
-						Log.Info(output);
-						File.Delete(vsPath);
-						File.Delete(varPath);
-						File.Delete(fsPath);
-						if (success)
-						{
-							// Read binary files
-							uint8[] vsBinaryData = null;
-							if (!SystemUtils.ReadBinaryFile(vsBinaryPath, out vsBinaryData))
-							{
-								SystemUtils.ShowMessageBoxOKCancel("Shader Compile", scope $"'{vsBinaryPath}' vertex shader binary failed!");
-								System.Environment.Exit(1);
-							}
-							uint8[] fsBinaryData = null;
-							if (!SystemUtils.ReadBinaryFile(fsBinaryPath, out fsBinaryData))
-							{
-								SystemUtils.ShowMessageBoxOKCancel("Shader Compile", scope $"'{fsBinaryPath}' fragment shader binary failed!");
-								System.Environment.Exit(1);
-							}
-							binaryFile.WriteStrSized32(defineNames[defineIndex]).IgnoreError();
-							binaryFile.Write((int32)vsBinaryData.Count);
-							binaryFile.TryWrite(Span<uint8>(vsBinaryData, 0, vsBinaryData.Count));
-							binaryFile.Write((int32)fsBinaryData.Count);
-							binaryFile.TryWrite(Span<uint8>(fsBinaryData, 0, fsBinaryData.Count));
-							delete vsBinaryData;
-							delete fsBinaryData;
-						}
-						File.Delete(vsBinaryPath);
-						File.Delete(fsBinaryPath);
 					}
-					if(!success) {
+					if (!success)
+					{
 						break;
 					}
 				}
