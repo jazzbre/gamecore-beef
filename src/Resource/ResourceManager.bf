@@ -38,8 +38,8 @@ namespace GameCore
 		private static Job loadResourcesJob = null;
 
 		#if BF_PLATFORM_WINDOWS
-		const String ToolsPath = "/../bgfx-beef/submodules/bgfx/.build/win64_vs2019/bin/";
-		const String ToolsPath2 = "/../bgfx-beef/submodules/bgfx/.build/win64_vs2017/bin/";
+		const String ToolsPath = "/../bgfx-beef/submodules/bgfx/.build/win64_vs2022/bin/";
+		const String ToolsPath2 = "/../bgfx-beef/submodules/bgfx/.build/win64_vs2019/bin/";
 		public static ResourceBuilderPlatform ActiveResourceBuilderPlatform = .Windows;
 			#elif BF_PLATFORM_MACOS
 		const String ToolsPath = "/../bgfx-beef/submodules/bgfx/.build/osx-x64/bin/";

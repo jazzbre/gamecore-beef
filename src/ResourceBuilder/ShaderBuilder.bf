@@ -38,11 +38,11 @@ namespace GameCore
 		private static var platformSettings = new PlatformSettings[(int)ResourceBuilderPlatform.Last]
 			( // Windows
 			new PlatformSettings(
-			new RendererSettings(.Direct3D11, "--platform windows --profile vs_4_0 -O 3", "--platform windows --profile ps_4_0 -O 3", "-platform windows --profile cs_5_0 -O 3"),
-			new RendererSettings(.OpenGL, "--platform windows -O 3", "--platform windows -O 3", "--platform linux -p 430 -O 3"),
+			new RendererSettings(.Direct3D11, "--platform windows --profile s_4_0 -O 3", "--platform windows --profile s_4_0 -O 3", "-platform windows --profile s_5_0 -O 3"),
+			new RendererSettings(.OpenGL, "--platform linux -p 130 -O 3", "--platform linux -p 130 -O 3", "--platform linux -p 430 -O 3"),
 			new RendererSettings(.Vulkan, "--platform linux -p spirv", "--platform linux -p spirv", "--platform linux -p spirv")),
 			new PlatformSettings(
-			new RendererSettings(.OpenGL, "--platform linux -O 3", "--platform linux -O 3", "--platform linux -p 430 -O 3"),
+			new RendererSettings(.OpenGL, "--platform linux -p 130 -O 3", "--platform linux -p 130 -O 3", "--platform linux -p 430 -O 3"),
 			new RendererSettings(.Vulkan, "--platform linux -p spirv", "--platform linux -p spirv", "--platform linux -p spirv")), // Linux
 			new PlatformSettings(
 			new RendererSettings(.Metal, "--platform osx -p metal -O 3", "--platform osx -p metal -O 3", "--platform osx -p metal -O 3"),
