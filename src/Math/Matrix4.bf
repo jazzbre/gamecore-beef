@@ -236,16 +236,24 @@ namespace GameCore
 			let height = 1.0f / (float)Math.Tan(_fovy * 0.5f);
 			let width  = height * 1.0f / _aspect;
 			let diff = _far - _near;
-			let aa = _homogeneousNdc ? (     _far + _near) / diff : _far / diff;
+
+			let aa = _homogeneousNdc ? (_far + _near) / diff : _far / diff;
 			let bb = _homogeneousNdc ? (2.0f * _far * _near) / diff : _near * aa;
+
 			var result = Matrix4.Identity;
 			result.d[0] = width;
 			result.d[5] = -height;
+
 			result.d[8] = 0.0f;
-			result.d[9] =  0.0f;
-			result.d[10] =   aa;
-			result.d[11] =  1.0f;
+			result.d[9] = 0.0f;
+			result.d[10] = aa;
+			result.d[11] = 1.0f;
+
+			result.d[12] = 0.0f;
+			result.d[13] = 0.0f;
 			result.d[14] = -bb;
+			result.d[15] = 0.0f;
+
 			return result;
 		}
 
