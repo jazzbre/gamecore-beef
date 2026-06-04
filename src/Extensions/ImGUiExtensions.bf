@@ -35,6 +35,11 @@ namespace ImGui
 			}
 		}
 
+		private static bool IsValidField(System.Reflection.FieldInfo field)
+		{
+			return field.IsPublic && field.IsInstanceField;
+		}
+
 		public static bool InputText(StringView name, String text)
 		{
 			var idScope = scope IDScope(text);
@@ -371,6 +376,10 @@ namespace ImGui
 			var pointer = (uint8*)&t;
 			for (var field in type.GetFields())
 			{
+				if (!IsValidField(field))
+				{
+					continue;
+				}
 				if (InputProperty(field.Name, field, field.FieldType, pointer + field.MemberOffset))
 				{
 					changed = true;
@@ -386,6 +395,10 @@ namespace ImGui
 			var pointer = (uint8*)Internal.UnsafeCastToPtr(t);
 			for (var field in type.GetFields())
 			{
+				if (!IsValidField(field))
+				{
+					continue;
+				}
 				if (InputProperty(field.Name, field, field.FieldType, pointer + field.MemberOffset))
 				{
 					changed = true;
