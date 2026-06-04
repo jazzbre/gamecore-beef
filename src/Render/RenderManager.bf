@@ -464,5 +464,15 @@ namespace GameCore
 		{
 			bgfx.set_uniform(shUniformHandle, &sh9.sh[0].x, 9);
 		}
+
+		public static void RenderFullScreenTextureAspect(uint16 viewId, bgfx.TextureHandle handle, Shader shader, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int programIndex = 0)
+		{
+			var stateFlags = _stateFlags != 0 ? _stateFlags : bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA;
+			var samplerFlags = _samplerFlags != 0 ? (uint32)_samplerFlags : (uint32)(bgfx.SamplerFlags.UClamp | bgfx.SamplerFlags.VClamp | bgfx.SamplerFlags.Point);
+			bgfx.set_vertex_count(6);
+			bgfx.set_texture(0, RenderManager.textureUniformHandles[0], handle, (uint32)samplerFlags);
+			bgfx.set_state((uint64)bgfx.StateFlags.WriteRgb, (uint32)stateFlags);
+			bgfx.submit(viewId, shader.Programs[programIndex], 0, (uint8)bgfx.DiscardFlags.All);
+		}
 	}
 }
