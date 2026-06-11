@@ -15,6 +15,15 @@ namespace GameCore
 		public float w;
 
 		public const Quaternion Identity = Quaternion(0, 0, 0, 1);
+		public const Quaternion RotateXAxis45 = Quaternion(0.38268343f, 0, 0, 0.92387953f);
+		public const Quaternion RotateXAxis90 = Quaternion(0.70710678f, 0, 0, 0.70710678f);
+		public const Quaternion RotateXAxis180 = Quaternion(1, 0, 0, 0);
+		public const Quaternion RotateYAxis45 = Quaternion(0, 0.38268343f, 0, 0.92387953f);
+		public const Quaternion RotateYAxis90 = Quaternion(0, 0.70710678f, 0, 0.70710678f);
+		public const Quaternion RotateYAxis180 = Quaternion(0, 1, 0, 0);
+		public const Quaternion RotateZAxis45 = Quaternion(0, 0, 0.38268343f, 0.92387953f);
+		public const Quaternion RotateZAxis90 = Quaternion(0, 0, 0.70710678f, 0.70710678f);
+		public const Quaternion RotateZAxis180 = Quaternion(0, 0, 1, 0);
 
 		public this()
 		{
