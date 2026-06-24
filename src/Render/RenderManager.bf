@@ -108,6 +108,25 @@ namespace GameCore
 			IsRenderTextureYFlipped = RendererType != .OpenGL && RendererType != .OpenGLES;
 		}
 
+		public static void Resize(int newWidth, int newHeight)
+		{
+			if (width == newWidth && height == newHeight)
+			{
+				return;
+			}
+			width = newWidth;
+			height = newHeight;
+			for (var renderTexture in temporaryRenderTextures)
+			{
+				renderTexture.Resize(newWidth, newHeight);
+			}
+			for (var renderTexture in temporaryHalfRenderTextures)
+			{
+				renderTexture.Resize(newWidth, newHeight);
+			}
+			temporaryRenderTextureWithDepth.Resize(newWidth, newHeight);
+		}
+
 		public static bool Initialize(int maxBatchCount = 128)
 		{
 			Log.Info(scope $"Render target {width}x{height}");

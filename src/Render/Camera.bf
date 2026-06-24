@@ -6,6 +6,9 @@ namespace GameCore
 {
 	class Camera
 	{
+		private Vector4[6] frustumPlanes;
+		private bool frustumValid;
+
 		public Vector3 position = .Zero;
 		public Quaternion rotation = .Identity;
 		public float fov = 60.0f;
@@ -22,6 +25,67 @@ namespace GameCore
 			worldMatrix = Matrix4.CreateTransform(position, .One, rotation);
 			viewMatrix = Matrix4.Inverse(worldMatrix);
 			projectionMatrix = Matrix4.CreatePerspectiveFOV(fov * (float)Math.DegreeToRadian, aspectRatio, nearPlane, farPlane);
+			UpdateFrustumPlanes();
+		}
+
+		public void SetMatrices(Matrix4 world, Matrix4 view, Matrix4 projection)
+		{
+			worldMatrix = world;
+			viewMatrix = view;
+			projectionMatrix = projection;
+			position = world.Translation;
+			rotation = Quaternion.Normalize(Quaternion.CreateFromRotationMatrix(world));
+			UpdateFrustumPlanes();
+		}
+
+		public bool IsBoundsVisible(Matrix4 worldMatrix, Bounds3 bounds)
+		{
+			if (!frustumValid)
+			{
+				return true;
+			}
+
+			let worldBounds = Bounds3.Transform(bounds, worldMatrix);
+			for (int32 i = 0; i < frustumPlanes.Count; i++)
+			{
+				let plane = frustumPlanes[i];
+				let positiveVertex = Vector3(
+					plane.x >= 0.0f ? worldBounds.max.x : worldBounds.min.x,
+					plane.y >= 0.0f ? worldBounds.max.y : worldBounds.min.y,
+					plane.z >= 0.0f ? worldBounds.max.z : worldBounds.min.z);
+				if (plane.x * positiveVertex.x + plane.y * positiveVertex.y + plane.z * positiveVertex.z + plane.w < 0.0f)
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+
+		private void UpdateFrustumPlanes()
+		{
+			let viewProjection = viewMatrix * projectionMatrix;
+			let columnX = viewProjection.GetColumn4(0);
+			let columnY = viewProjection.GetColumn4(1);
+			let columnZ = viewProjection.GetColumn4(2);
+			let columnW = viewProjection.GetColumn4(3);
+
+			frustumPlanes[0] = NormalizePlane(columnW + columnX);
+			frustumPlanes[1] = NormalizePlane(columnW - columnX);
+			frustumPlanes[2] = NormalizePlane(columnW + columnY);
+			frustumPlanes[3] = NormalizePlane(columnW - columnY);
+			frustumPlanes[4] = NormalizePlane(columnZ);
+			frustumPlanes[5] = NormalizePlane(columnW - columnZ);
+			frustumValid = true;
+		}
+
+		private static Vector4 NormalizePlane(Vector4 plane)
+		{
+			float normalLength = Math.Sqrt(plane.x * plane.x + plane.y * plane.y + plane.z * plane.z);
+			if (normalLength <= 0.000001f)
+			{
+				return plane;
+			}
+			return plane / normalLength;
 		}
 	}
 }
