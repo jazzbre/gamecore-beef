@@ -116,33 +116,55 @@ namespace GameCore
 			}
 			width = newWidth;
 			height = newHeight;
-			for (var renderTexture in temporaryRenderTextures)
+			ooWidth = 1.0f / width;
+			ooHeight = 1.0f / height;
+			aspectRatio = width * ooHeight;
+			viewBounds = .(.Zero, .(width, height));
+
+			if (temporaryRenderTextures.Count == 0)
 			{
-				renderTexture.Resize(newWidth, newHeight);
+				for (int i = 0; i < 2; ++i)
+				{
+					temporaryRenderTextures.Add(new .(width, height));
+					temporaryHalfRenderTextures.Add(new .(width, height, .RGBA16F));
+				}
 			}
-			for (var renderTexture in temporaryHalfRenderTextures)
+			else
 			{
-				renderTexture.Resize(newWidth, newHeight);
+				for (var renderTexture in temporaryRenderTextures)
+				{
+					renderTexture.Resize(newWidth, newHeight);
+				}
 			}
-			temporaryRenderTextureWithDepth.Resize(newWidth, newHeight);
+			if (temporaryHalfRenderTextures.Count == 0)
+			{
+				for (int i = 0; i < 2; ++i)
+				{
+					temporaryHalfRenderTextures.Add(new .(width, height, .RGBA16F));
+				}
+			}
+			else
+			{
+				for (var renderTexture in temporaryHalfRenderTextures)
+				{
+					renderTexture.Resize(newWidth, newHeight);
+				}
+			}
+			if (temporaryRenderTextureWithDepth == null)
+			{
+				temporaryRenderTextureWithDepth = new .(width, height, .RGBA16F, .D24S8);
+			} else
+			{
+				temporaryRenderTextureWithDepth.Resize(newWidth, newHeight);
+			}
 		}
 
 		public static bool Initialize(int maxBatchCount = 128)
 		{
 			Log.Info(scope $"Render target {width}x{height}");
 			SDL2.SDL.Log(scope $"Renderer:{RendererType}, {width}x{height}, IsRenderTextureYFlipped {IsRenderTextureYFlipped}");
-			ooWidth = 1.0f / width;
-			ooHeight = 1.0f / height;
-			aspectRatio = width * ooHeight;
-			viewBounds = .(.Zero, .(width, height));
 			batchRenderer = new .();
 			entityBatchRenderer = new .();
-			for (int i = 0; i < 2; ++i)
-			{
-				temporaryRenderTextures.Add(new .(width, height));
-				temporaryHalfRenderTextures.Add(new .(width, height, .RGBA16F));
-			}
-			temporaryRenderTextureWithDepth = new .(width, height, .RGBA16F, .D24S8);
 			// Generate batch buffers
 			// Setup buffers
 			bgfx.vertex_layout_begin(&batchVertexLayout, bgfx.get_renderer_type());
