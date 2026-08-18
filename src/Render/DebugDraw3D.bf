@@ -24,6 +24,7 @@ namespace GameCore
 		private static bgfx.VertexLayout cubeVertexLayout;
 
 		private static var debugVertices = new List<DebugVertex>() ~ delete _;
+		private static var debug2DVertices = new List<DebugVertex>() ~ delete _;
 		private static var debugSolidVertices = new List<DebugVertex>() ~ delete _;
 		private static var debugCubes = new List<Vector4>() ~ delete _;
 		private static var debugTextsPool = new List<DebugText>() ~ DeleteContainerAndItems!(_);
@@ -40,6 +41,30 @@ namespace GameCore
 			var coloruint = color.ToRGBA();
 			debugVertices.Add(DebugVertex() { position = a, color = coloruint });
 			debugVertices.Add(DebugVertex() { position = b, color = coloruint });
+		}
+
+		public static void DrawSegment(Vector2 start, Vector2 end, Color color, float thickness = 1.0f)
+		{
+			var segment = end - start;
+			float segmentLength = segment.Length;
+			if ((segmentLength <= 0.001f) || (thickness <= 0.0f))
+			{
+				return;
+			}
+
+			var perpendicular = Vector2(-segment.y, segment.x) * (thickness * 0.5f / segmentLength);
+			var startLeft = (start + perpendicular).xy0;
+			var startRight = (start - perpendicular).xy0;
+			var endLeft = (end + perpendicular).xy0;
+			var endRight = (end - perpendicular).xy0;
+			uint32 packedColor = color.ToRGBA();
+
+			debug2DVertices.Add(DebugVertex() { position = startLeft, color = packedColor });
+			debug2DVertices.Add(DebugVertex() { position = endLeft, color = packedColor });
+			debug2DVertices.Add(DebugVertex() { position = endRight, color = packedColor });
+			debug2DVertices.Add(DebugVertex() { position = startLeft, color = packedColor });
+			debug2DVertices.Add(DebugVertex() { position = endRight, color = packedColor });
+			debug2DVertices.Add(DebugVertex() { position = startRight, color = packedColor });
 		}
 
 		public static void DrawTriangle(Vector3 a, Vector3 b, Vector3 c, Color color)
@@ -256,7 +281,7 @@ namespace GameCore
 
 		public static void Render(uint16 viewId, bool render = true)
 		{
-			if (!render || (debugVertices.Count == 0 && debug2DTexts.Count == 0 && debugSolidVertices.Count == 0 && debugCubes.Count == 0))
+			if (!render || (debugVertices.Count == 0 && debug2DVertices.Count == 0 && debug2DTexts.Count == 0 && debugSolidVertices.Count == 0 && debugCubes.Count == 0))
 			{
 				Clear();
 				return;
@@ -312,6 +337,21 @@ namespace GameCore
 				++RenderManager.statistics.submitCount;
 			}
 
+			let screenVerticesSize = (uint32)(debug2DVertices.Count * sizeof(DebugVertex));
+			if (screenVerticesSize > 0)
+			{
+				var screenVertexBuffer = bgfx.TransientVertexBuffer();
+				bgfx.alloc_transient_vertex_buffer(&screenVertexBuffer, (uint32)debug2DVertices.Count, &vertexLayout);
+				Internal.MemCpy(screenVertexBuffer.data, &debug2DVertices[0], (.)screenVerticesSize);
+				var stateFlags = bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.blend_function(bgfx.StateFlags.BlendSrcAlpha, bgfx.StateFlags.BlendInvSrcAlpha);
+				var identity = Matrix4.Identity;
+				bgfx.set_transform(identity.Ptr(), 1);
+				bgfx.set_state((uint64)stateFlags, 0);
+				bgfx.set_transient_vertex_buffer(0, &screenVertexBuffer, 0, (uint32)debug2DVertices.Count);
+				bgfx.submit(viewId, shader.Programs[2], 0, (uint8)bgfx.DiscardFlags.All);
+				++RenderManager.statistics.submitCount;
+			}
+
 			for (var debugText in debug2DTexts)
 			{
 				RenderText(viewId, debugText, 0);
@@ -326,6 +366,7 @@ namespace GameCore
 		public static void Clear()
 		{
 			debugVertices.Clear();
+			debug2DVertices.Clear();
 			debugSolidVertices.Clear();
 			debugCubes.Clear();
 			for (var debugText in debug2DTexts)

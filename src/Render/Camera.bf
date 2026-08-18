@@ -19,12 +19,14 @@ namespace GameCore
 		public Matrix4 worldMatrix = .Identity;
 		public Matrix4 viewMatrix = .Identity;
 		public Matrix4 projectionMatrix = .Identity;
+		public Matrix4 viewProjectionMatrix = .Identity;
 
 		public void UpdateMatrices(float aspectRatio)
 		{
 			worldMatrix = Matrix4.CreateTransform(position, .One, rotation);
 			viewMatrix = Matrix4.Inverse(worldMatrix);
 			projectionMatrix = Matrix4.CreatePerspectiveFOV(fov * (float)Math.DegreeToRadian, aspectRatio, nearPlane, farPlane);
+			viewProjectionMatrix = viewMatrix * projectionMatrix;
 			UpdateFrustumPlanes();
 		}
 
@@ -33,6 +35,7 @@ namespace GameCore
 			worldMatrix = world;
 			viewMatrix = view;
 			projectionMatrix = projection;
+			viewProjectionMatrix = viewMatrix * projectionMatrix;
 			position = world.Translation;
 			rotation = Quaternion.Normalize(Quaternion.CreateFromRotationMatrix(world));
 			UpdateFrustumPlanes();
@@ -49,10 +52,7 @@ namespace GameCore
 			for (int32 i = 0; i < frustumPlanes.Count; i++)
 			{
 				let plane = frustumPlanes[i];
-				let positiveVertex = Vector3(
-					plane.x >= 0.0f ? worldBounds.max.x : worldBounds.min.x,
-					plane.y >= 0.0f ? worldBounds.max.y : worldBounds.min.y,
-					plane.z >= 0.0f ? worldBounds.max.z : worldBounds.min.z);
+				let positiveVertex = Vector3(plane.x >= 0.0f ? worldBounds.max.x : worldBounds.min.x, plane.y >= 0.0f ? worldBounds.max.y : worldBounds.min.y, plane.z >= 0.0f ? worldBounds.max.z : worldBounds.min.z);
 				if (plane.x * positiveVertex.x + plane.y * positiveVertex.y + plane.z * positiveVertex.z + plane.w < 0.0f)
 				{
 					return false;
@@ -61,13 +61,31 @@ namespace GameCore
 			return true;
 		}
 
+		public Vector3 GetHomoPosition(Vector3 position)
+		{
+			var homoPosition = Vector3.Transform(position, viewProjectionMatrix);
+			homoPosition.xy /= homoPosition.z;
+			return homoPosition;
+		}
+
+		public Vector3 GetNormalizedPosition(Vector3 position)
+		{
+			let homoPosition = GetHomoPosition(position);
+			return .(0.5f + homoPosition.x * 0.5f, 0.5f + homoPosition.y * 0.5f, homoPosition.z);
+		}
+
+		public Vector3 GetScreenPosition(Vector3 position, Vector2 viewportSize)
+		{
+			let normalizedPosition = GetNormalizedPosition(position);
+			return .(normalizedPosition.xy * viewportSize, normalizedPosition.z);
+		}
+
 		private void UpdateFrustumPlanes()
 		{
-			let viewProjection = viewMatrix * projectionMatrix;
-			let columnX = viewProjection.GetColumn4(0);
-			let columnY = viewProjection.GetColumn4(1);
-			let columnZ = viewProjection.GetColumn4(2);
-			let columnW = viewProjection.GetColumn4(3);
+			let columnX = viewProjectionMatrix.GetColumn4(0);
+			let columnY = viewProjectionMatrix.GetColumn4(1);
+			let columnZ = viewProjectionMatrix.GetColumn4(2);
+			let columnW = viewProjectionMatrix.GetColumn4(3);
 
 			frustumPlanes[0] = NormalizePlane(columnW + columnX);
 			frustumPlanes[1] = NormalizePlane(columnW - columnX);

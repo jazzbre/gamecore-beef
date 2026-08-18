@@ -176,7 +176,7 @@ namespace GameCore
 			{
 				if (c == '\n')
 				{
-					lineExtents.Add(lineWidth);
+					lineExtents?.Add(lineWidth);
 					position = 0.0f;
 					lineWidth = 0.0f;
 					extents.y += (float)fontData.lineHeight;
@@ -192,10 +192,7 @@ namespace GameCore
 				lineWidth = Math.Max(lineWidth, maxWidth);
 				position += fontGlyph.xAdvance;
 			}
-			if (lineExtents != null)
-			{
-				lineExtents.Add(lineWidth);
-			}
+			lineExtents?.Add(lineWidth);
 			return extents;
 		}
 	}
