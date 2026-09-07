@@ -231,7 +231,11 @@ namespace GameCore
 			let sp = (float)Math.Sin(pitch * 0.5);
 			let cr = (float)Math.Cos(roll * 0.5);
 			let sr = (float)Math.Sin(roll * 0.5);
-			return .(cy * cp * sr - sy * sp * cr, sy * cp * sr + cy * sp * cr, sy * cp * cr - cy * sp * sr, cy * cp * cr + sy * sp * sr);
+			return .(
+				cy * sp * cr + sy * cp * sr,
+				sy * cp * cr - cy * sp * sr,
+				cy * cp * sr - sy * sp * cr,
+				cy * cp * cr + sy * sp * sr);
 		}
 
 		public static Quaternion Divide(Quaternion quaternion1, Quaternion quaternion2)
@@ -752,32 +756,25 @@ namespace GameCore
 			Vector3 angles;
 			let q = this;
 
-			// roll (x-axis rotation)
-			let sinr_cosp = 2 * (q.w * q.x + q.y * q.z);
-			let cosr_cosp = 1 - 2 * (q.x * q.x + q.y * q.y);
-			angles.x = Math.Atan2(sinr_cosp, cosr_cosp);
-
-			// pitch (y-axis rotation)
-			let sinp = 2 * (q.w * q.y - q.z * q.x);
-			if (Math.Abs(sinp) >= 1)
+			let sinPitch = 2 * (q.w * q.x - q.y * q.z);
+			if (Math.Abs(sinPitch) >= 1)
 			{
-				if (sinp < 0)
-				{
-					angles.y = -Math.PI_f / 2; // use 90 degrees if out of range
-				} else
-				{
-					angles.y = Math.PI_f / 2; // use 90 degrees if out of range
-				}
+				angles.x = sinPitch < 0 ? -Math.PI_f * 0.5f : Math.PI_f * 0.5f;
+				angles.y = Math.Atan2(
+					2 * (q.w * q.y - q.x * q.z),
+					1 - 2 * (q.y * q.y + q.z * q.z));
+				angles.z = 0.0f;
 			}
 			else
 			{
-				angles.y = Math.Asin(sinp);
+				angles.x = Math.Asin(sinPitch);
+				angles.y = Math.Atan2(
+					2 * (q.x * q.z + q.w * q.y),
+					1 - 2 * (q.x * q.x + q.y * q.y));
+				angles.z = Math.Atan2(
+					2 * (q.x * q.y + q.w * q.z),
+					1 - 2 * (q.x * q.x + q.z * q.z));
 			}
-
-			// yaw (z-axis rotation)
-			let siny_cosp = 2 * (q.w * q.z + q.x * q.y);
-			let cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
-			angles.z = Math.Atan2(siny_cosp, cosy_cosp);
 
 			return angles;
 		}

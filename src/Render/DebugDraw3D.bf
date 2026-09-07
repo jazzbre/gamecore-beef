@@ -281,7 +281,7 @@ namespace GameCore
 
 		public static void Render(uint16 viewId, bool render = true)
 		{
-			if (!render || (debugVertices.Count == 0 && debug2DVertices.Count == 0 && debug2DTexts.Count == 0 && debugSolidVertices.Count == 0 && debugCubes.Count == 0))
+			if (!render || (debugVertices.Count == 0 && debug2DVertices.Count == 0 && debug2DTexts.Count == 0 && debug3DTexts.Count == 0 && debugSolidVertices.Count == 0 && debugCubes.Count == 0))
 			{
 				Clear();
 				return;
