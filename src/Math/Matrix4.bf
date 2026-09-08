@@ -465,18 +465,18 @@ namespace GameCore
 			result.v.m00 = 1;
 			result.v.m10 = 0;
 			result.v.m20 = 0;
-			result.v.m30 = 0;
+			result.v.m30 = position.x;
 			result.v.m01 = 0;
 			result.v.m11 = 1;
 			result.v.m21 = 0;
-			result.v.m31 = 0;
+			result.v.m31 = position.y;
 			result.v.m02 = 0;
 			result.v.m12 = 0;
 			result.v.m22 = 1;
-			result.v.m32 = 0;
-			result.v.m03 = position.x;
-			result.v.m13 = position.y;
-			result.v.m23 = position.z;
+			result.v.m32 = position.z;
+			result.v.m03 = 0;
+			result.v.m13 = 0;
+			result.v.m23 = 0;
 			result.v.m33 = 1;
 			return result;
 		}
