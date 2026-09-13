@@ -287,34 +287,44 @@ namespace GameCore
 				return;
 			}
 
-			let solidVerticesSize = (uint32)(debugSolidVertices.Count * sizeof(DebugVertex));
+			var solidVerticesSize = (uint32)(debugSolidVertices.Count * sizeof(DebugVertex));
 			if (solidVerticesSize > 0)
 			{
 				var tvb = bgfx.TransientVertexBuffer();
-				bgfx.alloc_transient_vertex_buffer(&tvb, (uint32)debugSolidVertices.Count, &vertexLayout);
-				Internal.MemCpy(tvb.data, &debugSolidVertices[0], (.)solidVerticesSize);
-				var stateFlags = bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | bgfx.StateFlags.DepthTestLequal | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
-				var identity = Matrix4.Identity;
-				bgfx.set_transform(identity.Ptr(), 1);
-				bgfx.set_state((uint64)stateFlags, 0);
-				bgfx.set_transient_vertex_buffer(0, &tvb, 0, (uint32)debugSolidVertices.Count);
-				bgfx.submit(viewId, shader.Programs[0], 0, (uint8)bgfx.DiscardFlags.All);
-				++RenderManager.statistics.submitCount;
+				let availableCount = bgfx.get_avail_transient_vertex_buffer((uint32)debugSolidVertices.Count, &vertexLayout);
+				if (availableCount > 0)
+				{
+					bgfx.alloc_transient_vertex_buffer(&tvb, availableCount, &vertexLayout);
+					solidVerticesSize = (uint32)(availableCount * sizeof(DebugVertex));
+					Internal.MemCpy(tvb.data, &debugSolidVertices[0], (.)solidVerticesSize);
+					var stateFlags = bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | bgfx.StateFlags.DepthTestLequal | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
+					var identity = Matrix4.Identity;
+					bgfx.set_transform(identity.Ptr(), 1);
+					bgfx.set_state((uint64)stateFlags, 0);
+					bgfx.set_transient_vertex_buffer(0, &tvb, 0, (uint32)availableCount);
+					bgfx.submit(viewId, shader.Programs[0], 0, (uint8)bgfx.DiscardFlags.All);
+					++RenderManager.statistics.submitCount;
+				}
 			}
 
-			let verticesSize = (uint32)(debugVertices.Count * sizeof(DebugVertex));
+			var verticesSize = (uint32)(debugVertices.Count * sizeof(DebugVertex));
 			if (verticesSize > 0)
 			{
 				var tvb = bgfx.TransientVertexBuffer();
-				bgfx.alloc_transient_vertex_buffer(&tvb, (uint32)debugVertices.Count, &vertexLayout);
-				Internal.MemCpy(tvb.data, &debugVertices[0], (.)verticesSize);
-				var stateFlags = bgfx.StateFlags.PtLines | bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | bgfx.StateFlags.DepthTestLequal | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
-				var identity = Matrix4.Identity;
-				bgfx.set_transform(identity.Ptr(), 1);
-				bgfx.set_state((uint64)stateFlags, 0);
-				bgfx.set_transient_vertex_buffer(0, &tvb, 0, (uint32)debugVertices.Count);
-				bgfx.submit(viewId, shader.Programs[0], 0, (uint8)bgfx.DiscardFlags.All);
-				++RenderManager.statistics.submitCount;
+				let availableCount = bgfx.get_avail_transient_vertex_buffer((uint32)debugVertices.Count, &vertexLayout);
+				if (availableCount > 0)
+				{
+					bgfx.alloc_transient_vertex_buffer(&tvb, availableCount, &vertexLayout);
+					verticesSize = (uint32)(availableCount * sizeof(DebugVertex));
+					Internal.MemCpy(tvb.data, &debugVertices[0], (.)verticesSize);
+					var stateFlags = bgfx.StateFlags.PtLines | bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | bgfx.StateFlags.DepthTestLequal | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
+					var identity = Matrix4.Identity;
+					bgfx.set_transform(identity.Ptr(), 1);
+					bgfx.set_state((uint64)stateFlags, 0);
+					bgfx.set_transient_vertex_buffer(0, &tvb, 0, availableCount);
+					bgfx.submit(viewId, shader.Programs[0], 0, (uint8)bgfx.DiscardFlags.All);
+					++RenderManager.statistics.submitCount;
+				}
 			}
 
 			let cubeVerticesSize = (uint32)(debugCubes.Count * sizeof(Vector4));
@@ -341,15 +351,19 @@ namespace GameCore
 			if (screenVerticesSize > 0)
 			{
 				var screenVertexBuffer = bgfx.TransientVertexBuffer();
-				bgfx.alloc_transient_vertex_buffer(&screenVertexBuffer, (uint32)debug2DVertices.Count, &vertexLayout);
-				Internal.MemCpy(screenVertexBuffer.data, &debug2DVertices[0], (.)screenVerticesSize);
-				var stateFlags = bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.blend_function(bgfx.StateFlags.BlendSrcAlpha, bgfx.StateFlags.BlendInvSrcAlpha);
-				var identity = Matrix4.Identity;
-				bgfx.set_transform(identity.Ptr(), 1);
-				bgfx.set_state((uint64)stateFlags, 0);
-				bgfx.set_transient_vertex_buffer(0, &screenVertexBuffer, 0, (uint32)debug2DVertices.Count);
-				bgfx.submit(viewId, shader.Programs[2], 0, (uint8)bgfx.DiscardFlags.All);
-				++RenderManager.statistics.submitCount;
+				let availableCount = bgfx.get_avail_transient_vertex_buffer((uint32)debugVertices.Count, &vertexLayout);
+				if (availableCount > 0)
+				{
+					bgfx.alloc_transient_vertex_buffer(&screenVertexBuffer, (uint32)debug2DVertices.Count, &vertexLayout);
+					Internal.MemCpy(screenVertexBuffer.data, &debug2DVertices[0], (.)screenVerticesSize);
+					var stateFlags = bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.blend_function(bgfx.StateFlags.BlendSrcAlpha, bgfx.StateFlags.BlendInvSrcAlpha);
+					var identity = Matrix4.Identity;
+					bgfx.set_transform(identity.Ptr(), 1);
+					bgfx.set_state((uint64)stateFlags, 0);
+					bgfx.set_transient_vertex_buffer(0, &screenVertexBuffer, 0, (uint32)debug2DVertices.Count);
+					bgfx.submit(viewId, shader.Programs[2], 0, (uint8)bgfx.DiscardFlags.All);
+					++RenderManager.statistics.submitCount;
+				}
 			}
 
 			for (var debugText in debug2DTexts)
