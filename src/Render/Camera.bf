@@ -4,10 +4,22 @@ using System.Collections;
 
 namespace GameCore
 {
+	/// What a pass wants from a camera beyond its matrices.
+	public enum CameraRenderFlags : uint32
+	{
+		None = 0,
+		/// Only the depth of the geometry matters, so material, lighting and texture setup is
+		/// skipped. A shadow cascade renders this way.
+		DepthOnly = 1,
+	}
+
 	class Camera
 	{
 		private Vector4[6] frustumPlanes;
 		private bool frustumValid;
+
+		public CameraRenderFlags renderFlags = .None;
+		public bool IsDepthOnly => (renderFlags & .DepthOnly) != .None;
 
 		public Vector3 position = .Zero;
 		public Quaternion rotation = .Identity;
