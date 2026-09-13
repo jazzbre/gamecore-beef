@@ -351,16 +351,16 @@ namespace GameCore
 			if (screenVerticesSize > 0)
 			{
 				var screenVertexBuffer = bgfx.TransientVertexBuffer();
-				let availableCount = bgfx.get_avail_transient_vertex_buffer((uint32)debugVertices.Count, &vertexLayout);
+				let availableCount = bgfx.get_avail_transient_vertex_buffer((uint32)debug2DVertices.Count, &vertexLayout);
 				if (availableCount > 0)
 				{
-					bgfx.alloc_transient_vertex_buffer(&screenVertexBuffer, (uint32)debug2DVertices.Count, &vertexLayout);
+					bgfx.alloc_transient_vertex_buffer(&screenVertexBuffer, (uint32)availableCount, &vertexLayout);
 					Internal.MemCpy(screenVertexBuffer.data, &debug2DVertices[0], (.)screenVerticesSize);
 					var stateFlags = bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.blend_function(bgfx.StateFlags.BlendSrcAlpha, bgfx.StateFlags.BlendInvSrcAlpha);
 					var identity = Matrix4.Identity;
 					bgfx.set_transform(identity.Ptr(), 1);
 					bgfx.set_state((uint64)stateFlags, 0);
-					bgfx.set_transient_vertex_buffer(0, &screenVertexBuffer, 0, (uint32)debug2DVertices.Count);
+					bgfx.set_transient_vertex_buffer(0, &screenVertexBuffer, 0, (uint32)availableCount);
 					bgfx.submit(viewId, shader.Programs[2], 0, (uint8)bgfx.DiscardFlags.All);
 					++RenderManager.statistics.submitCount;
 				}
