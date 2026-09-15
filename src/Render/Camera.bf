@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Bgfx;
 using System.Collections;
 
 namespace GameCore
@@ -17,9 +18,15 @@ namespace GameCore
 	{
 		private Vector4[6] frustumPlanes;
 		private bool frustumValid;
+		private int frustumPlaneCount;
 
 		public CameraRenderFlags renderFlags = .None;
 		public bool IsDepthOnly => (renderFlags & .DepthOnly) != .None;
+		public bool UseReversedDepth = false;
+		public bool IsReversedDepth => UseReversedDepth && !IsDepthOnly;
+		public float DepthClearValue => IsReversedDepth ? 0.0f : 1.0f;
+		public bgfx.StateFlags DepthTest => IsReversedDepth ? .DepthTestGequal : .DepthTestLequal;
+		public static bool HomogeneousDepth => bgfx.get_caps() != null && bgfx.get_caps().homogeneousDepth != 0;
 
 		public Vector3 position = .Zero;
 		public Quaternion rotation = .Identity;
@@ -37,7 +44,9 @@ namespace GameCore
 		{
 			worldMatrix = Matrix4.CreateTransform(position, .One, rotation);
 			viewMatrix = Matrix4.Inverse(worldMatrix);
-			projectionMatrix = Matrix4.CreatePerspectiveFOV(fov * (float)Math.DegreeToRadian, aspectRatio, nearPlane, farPlane);
+			projectionMatrix = IsReversedDepth
+				? Matrix4.CreatePerspectiveReversedInfinite(fov * (float)Math.DegreeToRadian, aspectRatio, nearPlane, HomogeneousDepth)
+				: Matrix4.CreatePerspectiveFOV(fov * (float)Math.DegreeToRadian, aspectRatio, nearPlane, farPlane, HomogeneousDepth);
 			viewProjectionMatrix = viewMatrix * projectionMatrix;
 			UpdateFrustumPlanes();
 		}
@@ -61,7 +70,7 @@ namespace GameCore
 			}
 
 			let worldBounds = Bounds3.Transform(bounds, worldMatrix);
-			for (int32 i = 0; i < frustumPlanes.Count; i++)
+			for (int32 i = 0; i < frustumPlaneCount; i++)
 			{
 				let plane = frustumPlanes[i];
 				let positiveVertex = Vector3(plane.x >= 0.0f ? worldBounds.max.x : worldBounds.min.x, plane.y >= 0.0f ? worldBounds.max.y : worldBounds.min.y, plane.z >= 0.0f ? worldBounds.max.z : worldBounds.min.z);
@@ -75,9 +84,12 @@ namespace GameCore
 
 		public Vector3 GetHomoPosition(Vector3 position)
 		{
-			var homoPosition = Vector3.Transform(position, viewProjectionMatrix);
-			homoPosition.xy /= homoPosition.z;
-			return homoPosition;
+			let clipPosition = Vector4.Transform(position.xyz1, viewProjectionMatrix);
+			if (Math.Abs(clipPosition.w) < 0.000001f)
+			{
+				return .Zero;
+			}
+			return clipPosition.xyz / clipPosition.w;
 		}
 
 		public Vector3 GetNormalizedPosition(Vector3 position)
@@ -103,8 +115,12 @@ namespace GameCore
 			frustumPlanes[1] = NormalizePlane(columnW - columnX);
 			frustumPlanes[2] = NormalizePlane(columnW + columnY);
 			frustumPlanes[3] = NormalizePlane(columnW - columnY);
-			frustumPlanes[4] = NormalizePlane(columnZ);
-			frustumPlanes[5] = NormalizePlane(columnW - columnZ);
+			frustumPlanes[4] = NormalizePlane(IsReversedDepth ? columnW - columnZ : (HomogeneousDepth ? columnW + columnZ : columnZ));
+			frustumPlaneCount = IsReversedDepth ? 5 : 6;
+			if (!IsReversedDepth)
+			{
+				frustumPlanes[5] = NormalizePlane(columnW - columnZ);
+			}
 			frustumValid = true;
 		}
 

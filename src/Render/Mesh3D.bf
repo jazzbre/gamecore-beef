@@ -121,13 +121,13 @@ namespace GameCore
 			}
 		}
 
-		public void Render(uint16 viewId, Matrix4 worldMatrix, Shader shader, bgfx.TextureHandle[] textureHandles, Color color = Color.White, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int programIndex = 0)
+		public void Render(uint16 viewId, Matrix4 worldMatrix, Shader shader, bgfx.TextureHandle[] textureHandles, Color color = Color.White, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int programIndex = 0, Camera camera = null)
 		{
 			if (!VertexBufferHandle.Valid || !IndexBufferHandle.Valid)
 			{
 				return;
 			}
-			var stateFlags = _stateFlags != 0 ? _stateFlags : bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | bgfx.StateFlags.DepthTestLequal | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
+			var stateFlags = _stateFlags != 0 ? _stateFlags : bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | (camera != null ? camera.DepthTest : bgfx.StateFlags.DepthTestLequal) | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
 			var matrix = worldMatrix;
 			bgfx.set_transform(matrix.Ptr(), 1);
 			bgfx.set_state((uint64)stateFlags, 0);

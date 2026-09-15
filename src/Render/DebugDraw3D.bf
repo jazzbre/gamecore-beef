@@ -279,7 +279,7 @@ namespace GameCore
 			DebugFont.RenderText(RenderManager.batchRenderer, RenderManager.GetShader(.Font), viewId, .Zero, matrix, debugText.color, debugText.text, .Black, shaderProgramIndex, 0, null, modelViewMatrix);
 		}
 
-		public static void Render(uint16 viewId, bool render = true)
+		public static void Render(uint16 viewId, bool render = true, Camera camera = null)
 		{
 			if (!render || (debugVertices.Count == 0 && debug2DVertices.Count == 0 && debug2DTexts.Count == 0 && debug3DTexts.Count == 0 && debugSolidVertices.Count == 0 && debugCubes.Count == 0))
 			{
@@ -297,7 +297,7 @@ namespace GameCore
 					bgfx.alloc_transient_vertex_buffer(&tvb, availableCount, &vertexLayout);
 					solidVerticesSize = (uint32)(availableCount * sizeof(DebugVertex));
 					Internal.MemCpy(tvb.data, &debugSolidVertices[0], (.)solidVerticesSize);
-					var stateFlags = bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | bgfx.StateFlags.DepthTestLequal | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
+					var stateFlags = bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | (camera != null ? camera.DepthTest : bgfx.StateFlags.DepthTestLequal) | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
 					var identity = Matrix4.Identity;
 					bgfx.set_transform(identity.Ptr(), 1);
 					bgfx.set_state((uint64)stateFlags, 0);
@@ -317,7 +317,7 @@ namespace GameCore
 					bgfx.alloc_transient_vertex_buffer(&tvb, availableCount, &vertexLayout);
 					verticesSize = (uint32)(availableCount * sizeof(DebugVertex));
 					Internal.MemCpy(tvb.data, &debugVertices[0], (.)verticesSize);
-					var stateFlags = bgfx.StateFlags.PtLines | bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | bgfx.StateFlags.DepthTestLequal | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
+					var stateFlags = bgfx.StateFlags.PtLines | bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | (camera != null ? camera.DepthTest : bgfx.StateFlags.DepthTestLequal) | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
 					var identity = Matrix4.Identity;
 					bgfx.set_transform(identity.Ptr(), 1);
 					bgfx.set_state((uint64)stateFlags, 0);
@@ -335,7 +335,7 @@ namespace GameCore
 					bgfx.destroy_vertex_buffer(cube_vertex_buffer_handle);
 				}
 				cube_vertex_buffer_handle = bgfx.create_vertex_buffer(bgfx.copy(&debugCubes[0], (.)cubeVerticesSize), &cubeVertexLayout, (uint16)bgfx.BufferFlags.ComputeRead);
-				var stateFlags = bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | bgfx.StateFlags.DepthTestLequal | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
+				var stateFlags = bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | (camera != null ? camera.DepthTest : bgfx.StateFlags.DepthTestLequal) | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
 				var identity = Matrix4.Identity;
 				bgfx.set_transform(identity.Ptr(), 1);
 				bgfx.set_state((uint64)stateFlags, 0);

@@ -231,6 +231,19 @@ namespace GameCore
 			result.v.m23 = (nearPlaneDistance * farPlaneDistance) / (nearPlaneDistance - farPlaneDistance);
 		}
 
+		public static Matrix4 CreatePerspectiveReversedInfinite(float fieldOfView, float aspectRatio, float nearDistance, bool homogeneousDepth = false)
+		{
+			let height = 1.0f / (float)Math.Tan(fieldOfView * 0.5f);
+			var result = Matrix4.Identity;
+			result.v.m00 = height / aspectRatio;
+			result.v.m11 = -height;
+			result.v.m22 = homogeneousDepth ? -1.0f : 0.0f;
+			result.v.m23 = 1.0f;
+			result.v.m32 = nearDistance * (homogeneousDepth ? 2.0f : 1.0f);
+			result.v.m33 = 0.0f;
+			return result;
+		}
+
 		public static Matrix4 CreatePerspectiveFOV(float _fovy, float _aspect, float _near, float _far, bool _homogeneousNdc = false)
 		{
 			let height = 1.0f / (float)Math.Tan(_fovy * 0.5f);
