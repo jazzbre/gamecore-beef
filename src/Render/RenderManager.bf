@@ -6,26 +6,8 @@ namespace GameCore
 {
 	enum RenderShaderType
 	{
-		Default,
 		Font,
-		Field,
-		Mesh3D,
-		StaticMesh3D,
-		Dialog,
-		Particle,
 		Last
-	}
-
-	abstract class PostProcess
-	{
-		public abstract void OnRender(RenderTexture sourceRenderTexture);
-	}
-
-	class BloomPostProcess : PostProcess
-	{
-		public override void OnRender(RenderTexture sourceRenderTexture)
-		{
-		}
 	}
 
 	static class RenderManager
@@ -46,9 +28,6 @@ namespace GameCore
 
 		public static SpriteBatchRenderer batchRenderer;
 		public static SpriteBatchRenderer entityBatchRenderer;
-
-		public static List<RenderTexture> temporaryRenderTextures = new List<RenderTexture>();
-		public static List<RenderTexture> temporaryHalfRenderTextures = new List<RenderTexture>();
 
 		public static bgfx.TextureHandle readBackTextureHandle = .Null;
 
@@ -121,35 +100,6 @@ namespace GameCore
 			aspectRatio = width * ooHeight;
 			viewBounds = .(.Zero, .(width, height));
 
-			if (temporaryRenderTextures.Count == 0)
-			{
-				for (int i = 0; i < 2; ++i)
-				{
-					temporaryRenderTextures.Add(new .(width, height));
-					temporaryHalfRenderTextures.Add(new .(width, height, .RGBA16F));
-				}
-			}
-			else
-			{
-				for (var renderTexture in temporaryRenderTextures)
-				{
-					renderTexture.Resize(newWidth, newHeight);
-				}
-			}
-			if (temporaryHalfRenderTextures.Count == 0)
-			{
-				for (int i = 0; i < 2; ++i)
-				{
-					temporaryHalfRenderTextures.Add(new .(width, height, .RGBA16F));
-				}
-			}
-			else
-			{
-				for (var renderTexture in temporaryHalfRenderTextures)
-				{
-					renderTexture.Resize(newWidth, newHeight);
-				}
-			}
 			if (temporaryRenderTextureWithDepth == null)
 			{
 				temporaryRenderTextureWithDepth = new .(width, height, .RGBA16F, .D24S8);
@@ -175,13 +125,7 @@ namespace GameCore
 			// Tesselated
 			CreateQuad(2, 2, maxBatchCount, out batchTesselatedVertexBufferHandle, out batchTesselatedIndexBufferHandle, out batchTesselatedVertexCount, out batchTesselatedIndexCount);
 			// Load shaders
-			shaders[(int)RenderShaderType.Default] = ResourceManager.GetResource<Shader>("shaders/generic_sprite_texture");
 			shaders[(int)RenderShaderType.Font] = ResourceManager.GetResource<Shader>("shaders/font_sprite_texture");
-			shaders[(int)RenderShaderType.Field] = ResourceManager.GetResource<Shader>("shaders/field");
-			shaders[(int)RenderShaderType.Mesh3D] = ResourceManager.GetResource<Shader>("shaders/mesh3d");
-			shaders[(int)RenderShaderType.StaticMesh3D] = ResourceManager.GetResource<Shader>("shaders/staticmesh3d");
-			shaders[(int)RenderShaderType.Dialog] = ResourceManager.GetResource<Shader>("shaders/dialog");
-			shaders[(int)RenderShaderType.Particle] = ResourceManager.GetResource<Shader>("shaders/particle");
 			textureUniformHandles[0] = bgfx.create_uniform("s_texture", bgfx.UniformType.Sampler, 1);
 			for (int i = 1; i < textureUniformHandles.Count; ++i)
 			{
@@ -217,8 +161,6 @@ namespace GameCore
 			bgfx.destroy_uniform(shUniformHandle);
 			delete batchRenderer;
 			delete entityBatchRenderer;
-			DeleteContainerAndItems!(temporaryRenderTextures);
-			DeleteContainerAndItems!(temporaryHalfRenderTextures);
 			bgfx.destroy_vertex_buffer(batchVertexBufferHandle);
 			bgfx.destroy_index_buffer(batchIndexBufferHandle);
 			delete temporaryRenderTextureWithDepth;
@@ -255,35 +197,6 @@ namespace GameCore
 		public static uint16 NextPostViewId()
 		{
 			return ++PostViewId;
-		}
-
-		public static void PostProcess(Vector2 cameraPosition, RenderTexture sourceRenderTexture, List<PostProcess> postProcess)
-		{
-			var shaders = scope Shader[](ResourceManager.GetResource<Shader>("shaders/bloom_mask"), ResourceManager.GetResource<Shader>("shaders/blur_horizontal"), ResourceManager.GetResource<Shader>("shaders/blur_vertical"));
-			int targetIndex = 1;
-			for (int i = 0; i < 4; ++i)
-			{
-				targetIndex = targetIndex ^ 1;
-				var viewId = NextViewId();
-				var targetRenderTexture = temporaryRenderTextures[targetIndex];
-				if (i == 0)
-				{
-					BlitWithShader(viewId, shaders[0], targetRenderTexture, sourceRenderTexture.TextureHandle, .WriteRgb | .WriteA | .DepthTestAlways, .UClamp | .VClamp, false);
-				} else
-				{
-					BlitWithShader(viewId, shaders[1 + (i - 1) % 2], targetRenderTexture, temporaryRenderTextures[targetIndex ^ 1].TextureHandle, .WriteRgb | .WriteA | .DepthTestAlways, .UClamp | .VClamp, false);
-				}
-			}
-			bgfx.blit(NextViewId(), temporaryHalfRenderTextures[0].TextureHandle, 0, 0, 0, 0, sourceRenderTexture.TextureHandle, 0, 0, 0, 0, (uint16)sourceRenderTexture.Width, (uint16)sourceRenderTexture.Height, 0);
-			++RenderManager.statistics.blitCount;
-			{
-				var bloomApplyShader = ResourceManager.GetResource<Shader>("shaders/bloom_apply");
-				Vector4 settings = .(cameraPosition.x / viewBounds.Size.x, cameraPosition.y / viewBounds.Size.y, 0, 0);
-				settings.x += (.)(Time.Time * 0.01);
-				settings.y += (.)(Time.Time * -0.005);
-				bgfx.set_uniform(settingsUniformHandle, &settings.x, 1);
-				BlitWithShader(NextViewId(), bloomApplyShader, sourceRenderTexture, scope bgfx.TextureHandle[](temporaryHalfRenderTextures[0].TextureHandle, temporaryRenderTextures[targetIndex].TextureHandle), .WriteRgb | .WriteA | .DepthTestAlways, .UClamp | .VClamp | .Point, false);
-			}
 		}
 
 		public static void BlitWithShader(uint16 viewId, Shader shader, RenderTexture targetRenderTexture, bgfx.TextureHandle sourceTextureHandle, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, bool clear = true, int shiftScale = 0, int programIndex = 0)
