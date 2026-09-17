@@ -6,63 +6,55 @@ namespace GameCore
 	{
 		public static uint16 FloatToHalf(float f)
 		{
-			uint bits = *(uint*)&f; // reinterpret float as uint
-			uint sign = (bits >> 16) & 0x8000; // sign bit
-			uint exponent = (bits >> 23) & 0xFF;
-			uint mantissa = bits & 0x7FFFFF;
+			var value = f;
+			uint32 bits = *(uint32*)&value;
+			uint32 sign = (bits >> 16) & 0x8000;
+			uint32 exponent = (bits >> 23) & 0xFF;
+			uint32 mantissa = bits & 0x7FFFFF;
 
-			if (exponent == 255) // Inf or NaN
+			if (exponent == 255)
 			{
-				if (mantissa != 0)
-				{
-					// NaN
-					return (uint16)(sign | 0x7E00);
-				}
-				else
-				{
-					// Inf
-					return (uint16)(sign | 0x7C00);
-				}
+				return (uint16)(sign | (mantissa == 0 ? 0x7C00 : 0x7E00));
 			}
 
-			// normalised float
-			int newExp = (int)exponent - 127 + 15;
-			if (newExp >= 0x1F)
+			int halfExponent = (int)exponent - 112;
+			if (halfExponent >= 31)
 			{
-				// Overflow -> Inf
 				return (uint16)(sign | 0x7C00);
 			}
-			else if (newExp <= 0)
+			if (halfExponent < -10)
 			{
-				if (newExp < -10)
-				{
-					// Too small -> zero
-					return (uint16)sign;
-				}
-				// Subnormal
-				mantissa |= 0x800000;
-				int shift = 14 - newExp;
-				uint halfMantissa = mantissa >> shift;
-				if ((mantissa >> (shift - 1)) & 1 != 0) // round
-					halfMantissa++;
+				return (uint16)sign;
+			}
 
-				return (uint16)(sign | (halfMantissa & 0x3FF));
+			int shift = 13;
+			uint32 halfBits;
+			if (halfExponent <= 0)
+			{
+				mantissa |= 0x800000;
+				shift = 14 - halfExponent;
+				halfBits = mantissa >> shift;
 			}
 			else
 			{
-				uint halfExp = (uint)(newExp << 10);
-				uint halfMantissa = mantissa >> 13;
-				if ((mantissa & 0x1000) != 0) // round
-					halfMantissa++;
-
-				return (uint16)(sign | halfExp | (halfMantissa & 0x3FF));
+				halfBits = (uint32)(halfExponent << 10) | (mantissa >> shift);
 			}
+
+			uint32 discardedBits = mantissa & ((1U << shift) - 1);
+			uint32 halfway = 1U << (shift - 1);
+			// Round to nearest, ties to even; carry may enter the exponent.
+			if (discardedBits > halfway || (discardedBits == halfway && (halfBits & 1) != 0))
+			{
+				++halfBits;
+			}
+			return (uint16)(sign | halfBits);
 		}
+
 
 		public static float HalfToFloat(uint16 h)
 		{
 			uint sign = (uint)(h & 0x8000) << 16;
-			uint exponent = (uint)(h >> 10) & 0x1F;
+			int exponent = (h >> 10) & 0x1F;
 			uint mantissa = (uint)(h & 0x3FF);
 
 			if (exponent == 0)
@@ -83,7 +75,7 @@ namespace GameCore
 						exponent--;
 					}
 					mantissa &= 0x3FF;
-					uint bits = sign | ((exponent + (127 - 15)) << 23) | (mantissa << 13);
+					uint bits = sign | ((uint)(exponent + (127 - 15)) << 23) | (mantissa << 13);
 					return *(float*)&bits;
 				}
 			}
@@ -96,7 +88,7 @@ namespace GameCore
 			else
 			{
 				// normal
-				uint bits = sign | ((exponent + (127 - 15)) << 23) | (mantissa << 13);
+				uint bits = sign | ((uint)(exponent + (127 - 15)) << 23) | (mantissa << 13);
 				return *(float*)&bits;
 			}
 		}

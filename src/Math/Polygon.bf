@@ -28,6 +28,10 @@ namespace GameCore
 
 		public static bool PointInPolygon(Vector2 point, Vector2[] vertices)
 		{
+			if (vertices.Count < 3)
+			{
+				return false;
+			}
 			PolygonSide previousSide = .None;
 			let count = vertices.Count;
 			for (int n = 0; n < vertices.Count; ++n)

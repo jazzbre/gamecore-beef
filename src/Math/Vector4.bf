@@ -138,7 +138,11 @@ namespace GameCore
 
 		public int GetHashCode()
 		{
-			return (int)(this.x + this.y + this.z + this.w);
+			int hash = x == 0.0f ? 0 : x.GetHashCode();
+			hash = (hash &* 397) ^ (y == 0.0f ? 0 : y.GetHashCode());
+			hash = (hash &* 397) ^ (z == 0.0f ? 0 : z.GetHashCode());
+			hash = (hash &* 397) ^ (w == 0.0f ? 0 : w.GetHashCode());
+			return hash;
 		}
 
 		public uint32 ToRGBA()
@@ -234,13 +238,16 @@ namespace GameCore
 
 		public static Vector4 Transform(Vector4 vec, Quaternion quat)
 		{
-			Matrix4 matrix = quat.ToMatrix();
-			return Transform(vec, matrix);
+			return .(Vector3.Transform(vec.xyz, quat), vec.w);
 		}
 
 		public static Vector4 TransformNormal(Vector4 vec, Matrix4 matrix)
 		{
-			return .(Vector4.Dot(vec, matrix.GetColumn4(0)), Vector4.Dot(vec, matrix.GetColumn4(1)), Vector4.Dot(vec, matrix.GetColumn4(2)), 1);
+			return .(
+				vec.x * matrix.v.m00 + vec.y * matrix.v.m10 + vec.z * matrix.v.m20,
+				vec.x * matrix.v.m01 + vec.y * matrix.v.m11 + vec.z * matrix.v.m21,
+				vec.x * matrix.v.m02 + vec.y * matrix.v.m12 + vec.z * matrix.v.m22,
+				0);
 		}
 
 		public static bool operator ==(Vector4 value1, Vector4 value2)

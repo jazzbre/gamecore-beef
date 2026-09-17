@@ -69,6 +69,7 @@ namespace GameCore
 			{
 				x = value.x;
 				y = value.y;
+				z = value.z;
 			}
 		}
 
@@ -82,6 +83,7 @@ namespace GameCore
 			{
 				x = value.x;
 				y = value.y;
+				z = value.z;
 			}
 		}
 
@@ -116,7 +118,10 @@ namespace GameCore
 
 		public int GetHashCode()
 		{
-			return (int)(this.x + this.y + this.z);
+			int hash = x == 0.0f ? 0 : x.GetHashCode();
+			hash = (hash &* 397) ^ (y == 0.0f ? 0 : y.GetHashCode());
+			hash = (hash &* 397) ^ (z == 0.0f ? 0 : z.GetHashCode());
+			return hash;
 		}
 
 
@@ -213,8 +218,8 @@ namespace GameCore
 
 		public static Vector3 Transform(Vector3 vec, Quaternion quat)
 		{
-			Matrix4 matrix = quat.ToMatrix();
-			return Transform(vec, matrix);
+			let twiceCross = 2.0f * Cross(quat.xyz, vec);
+			return vec - quat.w * twiceCross + Cross(quat.xyz, twiceCross);
 		}
 
 		public static Vector3 TransformNormal(Vector3 normal, Matrix4 matrix)
@@ -224,9 +229,7 @@ namespace GameCore
 
 		public static Vector3 TransformNormal(Vector3 normal, Quaternion quaternion)
 		{
-			let unitVector = quaternion.xyz;
-			float unitLength = quaternion.w;
-			return 2.0f * Vector3.Dot(unitVector, normal) * unitVector + (unitLength * unitLength - Vector3.Dot(unitVector, unitVector)) * normal + 2.0f * unitLength * Vector3.Cross(unitVector, normal);
+			return Transform(normal, quaternion);
 		}
 
 		public static bool operator ==(Vector3 value1, Vector3 value2)

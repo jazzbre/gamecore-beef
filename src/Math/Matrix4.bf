@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace GameCore
 {
+	// Vectors multiply matrices on the left; translation occupies the last row.
 	[CRepr, Union]
 	public struct Matrix4
 	{
@@ -185,9 +186,9 @@ namespace GameCore
 			matrix.v.m01 = matrix.v.m21 = matrix.v.m31 = 0f;
 			matrix.v.m22 = farPlaneDistance / (nearPlaneDistance - farPlaneDistance);
 			matrix.v.m02 = matrix.v.m12 = 0f;
-			matrix.v.m32 = -1f;
+			matrix.v.m23 = -1f;
 			matrix.v.m03 = matrix.v.m13 = matrix.v.m33 = 0f;
-			matrix.v.m23 = (nearPlaneDistance * farPlaneDistance) / (nearPlaneDistance - farPlaneDistance);
+			matrix.v.m32 = (nearPlaneDistance * farPlaneDistance) / (nearPlaneDistance - farPlaneDistance);
 
 			return matrix;
 		}
@@ -226,9 +227,9 @@ namespace GameCore
 			result.v.m01 = result.v.m21 = result.v.m31 = 0;
 			result.v.m02 = result.v.m12 = 0f;
 			result.v.m22 = farPlaneDistance / (nearPlaneDistance - farPlaneDistance);
-			result.v.m32 = -1;
+			result.v.m23 = -1;
 			result.v.m03 = result.v.m13 = result.v.m33 = 0;
-			result.v.m23 = (nearPlaneDistance * farPlaneDistance) / (nearPlaneDistance - farPlaneDistance);
+			result.v.m32 = (nearPlaneDistance * farPlaneDistance) / (nearPlaneDistance - farPlaneDistance);
 		}
 
 		public static Matrix4 CreatePerspectiveReversedInfinite(float fieldOfView, float aspectRatio, float nearDistance, bool homogeneousDepth = false)
@@ -294,14 +295,15 @@ namespace GameCore
 			}
 			result = Matrix4.Identity;
 			result.v.m00 = (2f * nearPlaneDistance) / (right - left);
-			result.v.m10 = result.v.m20 = result.v.m30 = 0;
+			result.v.m10 = result.v.m30 = 0;
 			result.v.m11 = (2f * nearPlaneDistance) / (top - bottom);
-			result.v.m01 = result.v.m21 = result.v.m31 = 0;
-			result.v.m02 = (left + right) / (right - left);
-			result.v.m12 = (top + bottom) / (top - bottom);
+			result.v.m01 = result.v.m31 = 0;
+			result.v.m20 = (left + right) / (right - left);
+			result.v.m21 = (top + bottom) / (top - bottom);
 			result.v.m22 = farPlaneDistance / (nearPlaneDistance - farPlaneDistance);
-			result.v.m32 = -1;
-			result.v.m23 = (nearPlaneDistance * farPlaneDistance) / (nearPlaneDistance - farPlaneDistance);
+			result.v.m23 = -1;
+			result.v.m32 = (nearPlaneDistance * farPlaneDistance) / (nearPlaneDistance - farPlaneDistance);
+			result.v.m33 = 0;
 		}
 
 		public static Matrix4 Multiply(Matrix4 m1, Matrix4 m2)
@@ -513,20 +515,22 @@ namespace GameCore
 			return m;
 		}
 
-		public static void CreatePerspective(float _x, float _y, float _width, float _height, float _near, float _far, bool _homogeneousNdc, bool _handnessRight = false)
+		public static Matrix4 CreatePerspective(float _x, float _y, float _width, float _height, float _near, float _far, bool _homogeneousNdc, bool _handnessRight = false)
 		{
-			let diff = _far - _near;
-			let aa = _homogeneousNdc ? (_far + _near) / diff : _far / diff;
-			let bb = _homogeneousNdc ? (2.0f * _far * _near) / diff : _near * aa;
+			let depthRange = _far - _near;
+			let depthScale = _homogeneousNdc ? (_far + _near) / depthRange : _far / depthRange;
+			let depthOffset = _homogeneousNdc ? (2.0f * _far * _near) / depthRange : _near * depthScale;
 
-			var m = Identity;
-			m.d[0] = _width;
-			m.d[5] = _height;
-			m.d[8] = _handnessRight ? _x : -_x;
-			m.d[9] = _handnessRight ? _y : -_y;
-			m.d[10] = _handnessRight ? -aa : aa;
-			m.d[11] = _handnessRight ? -1.0f : 1.0f;
-			m.d[14] = -bb;
+			var result = Identity;
+			result.d[0] = _width;
+			result.d[5] = _height;
+			result.d[8] = _handnessRight ? _x : -_x;
+			result.d[9] = _handnessRight ? _y : -_y;
+			result.d[10] = _handnessRight ? -depthScale : depthScale;
+			result.d[11] = _handnessRight ? -1.0f : 1.0f;
+			result.d[14] = -depthOffset;
+			result.d[15] = 0.0f;
+			return result;
 		}
 
 		public static Matrix4 CreatePixelPerfectOrtho(float width, float height, float near, float far)
@@ -548,7 +552,7 @@ namespace GameCore
 
 		bool IsAffine()
 		{
-			return v.m30 == 0 && v.m31 == 0 && v.m32 == 0 && v.m33 == 1;
+			return v.m03 == 0 && v.m13 == 0 && v.m23 == 0 && v.m33 == 1;
 		}
 
 		public static Matrix4 InverseAffine(Matrix4 mtx)
@@ -582,17 +586,17 @@ namespace GameCore
 			float r21 = m01 * m20 - m00 * m21;
 			float r22 = m00 * m11 - m01 * m10;
 
-			float m03 = mtx.v.m03, m13 = mtx.v.m13, m23 = mtx.v.m23;
+			let translation = mtx.Translation;
 
-			float r03 = -(r00 * m03 + r01 * m13 + r02 * m23);
-			float r13 = -(r10 * m03 + r11 * m13 + r12 * m23);
-			float r23 = -(r20 * m03 + r21 * m13 + r22 * m23);
+			let inverseTranslationX = -(translation.x * r00 + translation.y * r10 + translation.z * r20);
+			let inverseTranslationY = -(translation.x * r01 + translation.y * r11 + translation.z * r21);
+			let inverseTranslationZ = -(translation.x * r02 + translation.y * r12 + translation.z * r22);
 
 			return Matrix4(
-				r00, r01, r02, r03,
-				r10, r11, r12, r13,
-				r20, r21, r22, r23,
-				0, 0, 0, 1);
+				r00, r01, r02, 0,
+				r10, r11, r12, 0,
+				r20, r21, r22, 0,
+				inverseTranslationX, inverseTranslationY, inverseTranslationZ, 1);
 		}
 
 		public static Matrix4 Inverse(Matrix4 mtx)

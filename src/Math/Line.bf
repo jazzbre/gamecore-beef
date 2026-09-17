@@ -6,7 +6,16 @@ namespace GameCore
 	{
 		public static double DistanceToPoint(Vector2 point, Vector2 l1, Vector2 l2)
 		{
-			return Math.Abs((l2.x - l1.x) * (l1.y - point.y) - (l1.x - point.x) * (l2.y - l1.y)) / Math.Sqrt(Math.Pow(l2.x - l1.x, 2) + Math.Pow(l2.y - l1.y, 2));
+			double directionX = (double)l2.x - l1.x;
+			double directionY = (double)l2.y - l1.y;
+			double offsetX = (double)point.x - l1.x;
+			double offsetY = (double)point.y - l1.y;
+			let lengthSquared = directionX * directionX + directionY * directionY;
+			if (lengthSquared == 0.0)
+			{
+				return Math.Sqrt(offsetX * offsetX + offsetY * offsetY);
+			}
+			return Math.Abs(directionX * offsetY - directionY * offsetX) / Math.Sqrt(lengthSquared);
 		}
 
 		public static float GetPositionSegmentDelta(Vector2 position, Vector2 a, Vector2 b, float* segmentLength = null)

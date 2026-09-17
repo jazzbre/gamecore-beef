@@ -146,6 +146,8 @@ namespace GameCore
 		[Inline]
 		public static float SmoothUnion(float a, float b, float k)
 		{
+			if (k <= 0.0f)
+				return Union(a, b);
 			float h = Saturate(0.5f + 0.5f * (b - a) / k);
 			return Lerp(b, a, h) - k * h * (1.0f - h);
 		}
@@ -153,6 +155,8 @@ namespace GameCore
 		[Inline]
 		public static float SmoothIntersection(float a, float b, float k)
 		{
+			if (k <= 0.0f)
+				return Intersection(a, b);
 			float h = Saturate(0.5f - 0.5f * (b - a) / k);
 			return Lerp(b, a, h) + k * h * (1.0f - h);
 		}
@@ -160,6 +164,8 @@ namespace GameCore
 		[Inline]
 		public static float SmoothDifference(float a, float b, float k)
 		{
+			if (k <= 0.0f)
+				return Difference(a, b);
 			float h = Saturate(0.5f - 0.5f * (b + a) / k);
 			return Lerp(a, -b, h) + k * h * (1.0f - h);
 		}
@@ -195,7 +201,10 @@ namespace GameCore
 		{
 			Vector2 pa = p - a;
 			Vector2 ba = b - a;
-			float h = Saturate(Vector2.Dot(pa, ba) / Vector2.Dot(ba, ba));
+			let segmentLengthSquared = Vector2.Dot(ba, ba);
+			if (segmentLengthSquared == 0.0f)
+				return pa.Length;
+			float h = Saturate(Vector2.Dot(pa, ba) / segmentLengthSquared);
 			return (pa - ba * h).Length;
 		}
 
@@ -268,7 +277,10 @@ namespace GameCore
 		{
 			Vector3 pa = p - a;
 			Vector3 ba = b - a;
-			float h = Saturate(Vector3.Dot(pa, ba) / Vector3.Dot(ba, ba));
+			let segmentLengthSquared = Vector3.Dot(ba, ba);
+			if (segmentLengthSquared == 0.0f)
+				return pa.Length;
+			float h = Saturate(Vector3.Dot(pa, ba) / segmentLengthSquared);
 			return (pa - ba * h).Length;
 		}
 

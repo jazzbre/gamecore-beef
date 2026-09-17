@@ -187,8 +187,8 @@ namespace GameCore
 
 		public bool Contains(float x, float y)
 		{
-			return ((x >= x) && (x < x + width) &&
-				(y >= y) && (y < y + height));
+			return x >= this.x && x < this.x + width &&
+				y >= this.y && y < this.y + height;
 		}
 
 		public bool Contains(Point pt)
@@ -198,7 +198,8 @@ namespace GameCore
 
 		public bool Contains(Rect rect)
 		{
-			return Contains(rect.x, rect.y) && Contains(rect.x + rect.width, rect.y + rect.height);
+			return rect.x >= x && rect.y >= y &&
+				rect.x + rect.width <= x + width && rect.y + rect.height <= y + height;
 		}
 
 		public void Offset(float _x, float _y) mut

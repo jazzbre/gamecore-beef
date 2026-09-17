@@ -5,7 +5,8 @@ namespace GameCore
 {
 	class Worley
 	{
-		private const int MaxVoronoiVertexCount = 20;
+		private Vector2[] pingVertices = new Vector2[20] ~ delete _;
+		private Vector2[] pongVertices = new Vector2[20] ~ delete _;
 
 		private int seed;
 		private float cellSize;
@@ -61,18 +62,32 @@ namespace GameCore
 			return clippedCount;
 		}
 
+		private void EnsureClipCapacity(int requiredCount)
+		{
+			if (requiredCount <= pingVertices.Count)
+				return;
+
+			let capacity = Math.Max(requiredCount, pingVertices.Count * 2);
+			let expandedVertices = new Vector2[capacity];
+			pingVertices.CopyTo(expandedVertices, 0, 0, pingVertices.Count);
+			delete pingVertices;
+			pingVertices = expandedVertices;
+			delete pongVertices;
+			pongVertices = new Vector2[capacity];
+		}
+
 		private void SplitCell(Vector2[] shapeVertices, Vector2 cell, int cell_i, int cell_j)
 		{
-			let pingVertices = scope Vector2[MaxVoronoiVertexCount];
-			let pongVertices = scope Vector2[MaxVoronoiVertexCount];
-			var count = shapeVertices.Count > MaxVoronoiVertexCount ? MaxVoronoiVertexCount : shapeVertices.Count;
+			EnsureClipCapacity(shapeVertices.Count);
+			var count = shapeVertices.Count;
 			shapeVertices.CopyTo(pingVertices, 0, 0, shapeVertices.Count);
 			for (var i = 0; i < width; i++)
 			{
 				for (var j = 0; j < height; j++)
 				{
-					if (!(i == cell_i && j == cell_j) && Polygon.PointInPolygon(cell, shapeVertices))
+					if (!(i == cell_i && j == cell_j))
 					{
+						EnsureClipCapacity(count * 2);
 						count = ClipCell(shapeVertices, cell, i, j, pingVertices, pongVertices, count);
 						pongVertices.CopyTo(pingVertices, 0, 0, count);
 					}

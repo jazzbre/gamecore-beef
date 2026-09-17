@@ -60,7 +60,7 @@ namespace GameCore
 
 		public static bool Intersect(Bounds2 a, Bounds2 b)
 		{
-			return a.min.x < b.max.x && a.min.y < b.max.y && a.max.x >= b.min.x && a.max.y >= b.min.y;
+			return a.min.x < b.max.x && a.min.y < b.max.y && a.max.x > b.min.x && a.max.y > b.min.y;
 		}
 
 		public Vector2 GetClosestPoint(Vector2 point)

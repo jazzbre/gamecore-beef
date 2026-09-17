@@ -67,44 +67,12 @@ namespace GameCore
 
 		public static Quaternion Concatenate(Quaternion value1, Quaternion value2)
 		{
-			Quaternion quaternion;
-			float x = value2.x;
-			float y = value2.y;
-			float z = value2.z;
-			float w = value2.w;
-			float num4 = value1.x;
-			float num3 = value1.y;
-			float num2 = value1.z;
-			float num = value1.w;
-			float num12 = (y * num2) - (z * num3);
-			float num11 = (z * num4) - (x * num2);
-			float num10 = (x * num3) - (y * num4);
-			float num9 = ((x * num4) + (y * num3)) + (z * num2);
-			quaternion.x = ((x * num) + (num4 * w)) + num12;
-			quaternion.y = ((y * num) + (num3 * w)) + num11;
-			quaternion.z = ((z * num) + (num2 * w)) + num10;
-			quaternion.w = (w * num) - num9;
-			return quaternion;
+			return Multiply(value1, value2);
 		}
 
 		public static void Concatenate(ref Quaternion value1, ref Quaternion value2, out Quaternion result)
 		{
-			float x = value2.x;
-			float y = value2.y;
-			float z = value2.z;
-			float w = value2.w;
-			float num4 = value1.x;
-			float num3 = value1.y;
-			float num2 = value1.z;
-			float num = value1.w;
-			float num12 = (y * num2) - (z * num3);
-			float num11 = (z * num4) - (x * num2);
-			float num10 = (x * num3) - (y * num4);
-			float num9 = ((x * num4) + (y * num3)) + (z * num2);
-			result.x = ((x * num) + (num4 * w)) + num12;
-			result.y = ((y * num) + (num3 * w)) + num11;
-			result.z = ((z * num) + (num2 * w)) + num10;
-			result.w = (w * num) - num9;
+			Multiply(ref value1, ref value2, out result);
 		}
 
 		public void Conjugate() mut
@@ -301,7 +269,11 @@ namespace GameCore
 
 		public int GetHashCode()
 		{
-			ThrowUnimplemented();
+			int hash = x == 0.0f ? 0 : x.GetHashCode();
+			hash = (hash &* 397) ^ (y == 0.0f ? 0 : y.GetHashCode());
+			hash = (hash &* 397) ^ (z == 0.0f ? 0 : z.GetHashCode());
+			hash = (hash &* 397) ^ (w == 0.0f ? 0 : w.GetHashCode());
+			return hash;
 		}
 
 		public static Quaternion Inverse(Quaternion quaternion)
@@ -684,7 +656,7 @@ namespace GameCore
 
 		public override void ToString(String outStr)
 		{
-			ThrowUnimplemented();
+			outStr.AppendF("{0:0.0#}, {1:0.0#}, {2:0.0#}, {3:0.0#}", x, y, z, w);
 		}
 
 		public Matrix4 ToMatrix()
@@ -757,7 +729,10 @@ namespace GameCore
 			let q = this;
 
 			let sinPitch = 2 * (q.w * q.x - q.y * q.z);
-			if (Math.Abs(sinPitch) >= 1)
+			let yawSine = 2 * (q.x * q.z + q.w * q.y);
+			let yawCosine = 1 - 2 * (q.x * q.x + q.y * q.y);
+			let cosPitch = Math.Sqrt(yawSine * yawSine + yawCosine * yawCosine);
+			if (cosPitch <= 0.000001f)
 			{
 				angles.x = sinPitch < 0 ? -Math.PI_f * 0.5f : Math.PI_f * 0.5f;
 				angles.y = Math.Atan2(
@@ -767,10 +742,8 @@ namespace GameCore
 			}
 			else
 			{
-				angles.x = Math.Asin(sinPitch);
-				angles.y = Math.Atan2(
-					2 * (q.x * q.z + q.w * q.y),
-					1 - 2 * (q.x * q.x + q.y * q.y));
+				angles.x = Math.Atan2(sinPitch, cosPitch);
+				angles.y = Math.Atan2(yawSine, yawCosine);
 				angles.z = Math.Atan2(
 					2 * (q.x * q.y + q.w * q.z),
 					1 - 2 * (q.x * q.x + q.z * q.z));
