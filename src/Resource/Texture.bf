@@ -136,22 +136,6 @@ namespace GameCore
 			return updated;
 		}
 
-		public Chipmunk2D.Shape CreateShape(Chipmunk2D.Body body, Vector2 offset = .Zero, double radius = 0.0, bool setMoment = true, SpriteFlags spriteFlags = .None)
-		{
-			var inputVerts = scope Vector2[convexHull.Count / 2];
-			GenerateShapeVertices(inputVerts, offset, spriteFlags);
-			var verts = scope Chipmunk2D.Vector2[convexHull.Count / 2];
-			for (int i = 0; i < inputVerts.Count; ++i)
-			{
-				verts[i] = Chipmunk2D.Vector2.FromVector(inputVerts[i]);
-			}
-			if (setMoment)
-			{
-				body.Moment = Chipmunk2D.Shape.MomentForPoly(body.Mass, verts, .(offset.x, offset.y), radius);
-			}
-			return body.AddPolyShape(verts, radius);
-		}
-
 		public Mesh CreateMesh()
 		{
 			if (mesh != null)

@@ -25,7 +25,7 @@ namespace GameCore
 		private static var debugIndices = new List<uint16>() ~ delete _;
 
 		// Debug draw
-		public static void DrawCircle(Chipmunk2D.Vector2 pos, Chipmunk2D.Real angle, Chipmunk2D.Real radius, Chipmunk2D.DebugColor outlineColor, Chipmunk2D.DebugColor fillColor, void* data = null)
+		public static void DrawCircle(Vector2 pos, float angle, float radius, Color outlineColor, Color fillColor)
 		{
 			var r = (float)(radius + DebugDrawPointLineScale);
 			var outlineColorRGBA = outlineColor.ToRGBA();
@@ -41,20 +41,9 @@ namespace GameCore
 			}
 		}
 
-		public static void DrawCircle(Vector2 pos, float angle, float radius, Color outlineColor, Color fillColor)
-		{
-			DrawCircle(Chipmunk2D.Vector2.FromVector(pos), angle, radius, .(outlineColor.r, outlineColor.g, outlineColor.b, outlineColor.a), .(fillColor.r, fillColor.g, fillColor.b, fillColor.a));
-		}
-
-		public static void DrawSegment(Chipmunk2D.Vector2 a, Chipmunk2D.Vector2 b, Chipmunk2D.DebugColor color, void* data = null)
-		{
-			DrawFatSegment(a, b, 1, color, color, data);
-		}
-
 		public static void DrawSegment(Vector2 a, Vector2 b, Color color)
 		{
-			Chipmunk2D.DebugColor fillColor = .(color.r, color.g, color.b, color.a);
-			DrawFatSegment(Chipmunk2D.Vector2.FromVector(a), Chipmunk2D.Vector2.FromVector(b), 0.5f, fillColor, fillColor);
+			DrawFatSegment(a, b, 0.5f, color, color);
 		}
 
 		public static void DrawAxis(Matrix4 worldMatrix, float size, float radius)
@@ -77,13 +66,10 @@ namespace GameCore
 			DrawSegment(rightTop, rightBottom, color);
 		}
 
-		public static void DrawFatSegment(Chipmunk2D.Vector2 a, Chipmunk2D.Vector2 b, Chipmunk2D.Real radius, Chipmunk2D.DebugColor outlineColor, Chipmunk2D.DebugColor fillColor, void* data = null)
+		public static void DrawFatSegment(Vector2 a, Vector2 b, float radius, Color outlineColor, Color fillColor)
 		{
 			var r = (float)(radius + DebugDrawPointLineScale);
-			var va = a.ToVector();
-			var vb = b.ToVector();
-
-			var t = Vector2.Normalize(vb - va);
+			var t = Vector2.Normalize(b - a);
 
 			var outlineColorRGBA = outlineColor.ToRGBA();
 			var fillColorRGBA = fillColor.ToRGBA();
@@ -103,17 +89,12 @@ namespace GameCore
 			}
 		}
 
-		public static void DrawFatSegment(Vector2 a, Vector2 b, float radius, Color outlineColor, Color fillColor)
-		{
-			DrawFatSegment(Chipmunk2D.Vector2.FromVector(a), Chipmunk2D.Vector2.FromVector(b), radius, .(outlineColor.r, outlineColor.g, outlineColor.b, outlineColor.a), .(fillColor.r, fillColor.g, fillColor.b, fillColor.a));
-		}
-
 		static Vector2 Perpendicular(Vector2 v)
 		{
 			return .(v.y, -v.x);
 		}
 
-		public static void DrawPolygon(int32 count, Chipmunk2D.Vector2* verts, Chipmunk2D.Real radius, Chipmunk2D.DebugColor outlineColor, Chipmunk2D.DebugColor fillColor, void* data = null)
+		public static void DrawPolygon(int32 count, Vector2* verts, float radius, Color outlineColor, Color fillColor)
 		{
 			float inset = (float) - Math.Max(0.0f, 2.0f * DebugDrawPointLineScale - radius);
 			float outset = (float)radius + DebugDrawPointLineScale;
@@ -151,9 +132,9 @@ namespace GameCore
 
 			for (int i = 0; i < count; i++)
 			{
-				var v0 = verts[i].ToVector();
-				var v_prev = verts[(i + (count - 1)) % count].ToVector();
-				var v_next = verts[(i + (count + 1)) % count].ToVector();
+				var v0 = verts[i];
+				var v_prev = verts[(i + (count - 1)) % count];
+				var v_next = verts[(i + (count + 1)) % count];
 
 				var n1 = Vector2.Normalize(Perpendicular(v0 - v_prev));
 				var n2 = Vector2.Normalize(Perpendicular(v_next - v0));
@@ -167,7 +148,7 @@ namespace GameCore
 			}
 		}
 
-		public static void DrawDot(Chipmunk2D.Real size, Chipmunk2D.Vector2 pos, Chipmunk2D.DebugColor color, void* data = null)
+		public static void DrawDot(float size, Vector2 pos, Color color)
 		{
 			var r = (float)(size * 0.5f * DebugDrawPointLineScale);
 			var fillColor = color.ToRGBA();
@@ -180,11 +161,6 @@ namespace GameCore
 			{
 				debugIndices.Add(vertexStart + index);
 			}
-		}
-
-		public static void DrawDot(float size, Vector2 pos, Color color)
-		{
-			DrawDot(size, Chipmunk2D.Vector2.FromVector(pos), .(color.r, color.g, color.b, color.a));
 		}
 
 		public static bool Initialize()

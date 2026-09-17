@@ -8,6 +8,10 @@ namespace GameCore
 	public class TextureBuilder : ResourceBuilder
 	{
 		public static readonly char8[] XmlSplits = new char8[](' ', '\"', '<', '>') ~ delete _;
+		private readonly List<Vector2> convexHullPoints = new .() ~ delete _;
+		private readonly List<Vector2> convexHullVertices = new .() ~ delete _;
+		private readonly HashSet<int> convexHullPixelIndices = new .() ~ delete _;
+
 		private static readonly String[] ExtensionsStrings = new String[]("png") ~ delete _;
 
 		public override String[] Extensions => ExtensionsStrings;
@@ -55,8 +59,10 @@ namespace GameCore
 			{
 				return;
 			}
-			var points = scope List<Chipmunk2D.Vector2>();
-			var pointsHashSet = scope HashSet<int>();
+			var points = convexHullPoints;
+			var pointsHashSet = convexHullPixelIndices;
+			points.Clear();
+			pointsHashSet.Clear();
 			double centerX = 0;
 			double centerY = 0;
 			double pixelCount = 0;
@@ -135,22 +141,48 @@ namespace GameCore
 			{
 				return;
 			}
-			let ooWidth = 1.0f / (double)(width - 1);
-			let ooHeight = 1.0f / (double)(height - 1);
+			let ooWidth = 1.0f / (float)(width - 1);
+			let ooHeight = 1.0f / (float)(height - 1);
 			for (int i = 0; i < points.Count; ++i)
 			{
 				points[i].x *= ooWidth;
 				points[i].y = (height - 1 - points[i].y) * ooHeight;
 			}
-			// Compute convex hull
-			var count = Chipmunk2D.Space.ConvexHullInplace(points.Count, &points[0], 0.0001);
-			for (int i = 0; i < count; ++i)
+			points.Sort(scope (left, right) => left.x == right.x ? left.y <=> right.y : left.x <=> right.x);
+			convexHullVertices.Clear();
+			for (var point in points)
 			{
-				var point = Vector2((float)points[i].x, (float)points[i].y);
+				while (convexHullVertices.Count >= 2 && Polygon.Cross(convexHullVertices[convexHullVertices.Count - 2], convexHullVertices[convexHullVertices.Count - 1], point) <= 0)
+				{
+					convexHullVertices.RemoveAt(convexHullVertices.Count - 1);
+				}
+				convexHullVertices.Add(point);
+			}
+			let upperHullStart = convexHullVertices.Count + 1;
+			for (int i = points.Count - 2; i >= 0; --i)
+			{
+				let point = points[i];
+				while (convexHullVertices.Count >= upperHullStart && Polygon.Cross(convexHullVertices[convexHullVertices.Count - 2], convexHullVertices[convexHullVertices.Count - 1], point) <= 0)
+				{
+					convexHullVertices.RemoveAt(convexHullVertices.Count - 1);
+				}
+				convexHullVertices.Add(point);
+			}
+			if (convexHullVertices.Count > 1)
+			{
+				convexHullVertices.RemoveAt(convexHullVertices.Count - 1);
+			}
+			sprite.convexHull.Clear();
+			double twiceArea = 0;
+			for (int i = 0; i < convexHullVertices.Count; ++i)
+			{
+				let point = convexHullVertices[i];
+				let nextPoint = convexHullVertices[(i + 1) % convexHullVertices.Count];
 				sprite.convexHull.Add(point.x);
 				sprite.convexHull.Add(point.y);
+				twiceArea += (double)point.x * nextPoint.y - (double)point.y * nextPoint.x;
 			}
-			sprite.moment = Chipmunk2D.Shape.AreaForPoly(&points[0], points.Count, 0.0);
+			sprite.moment = Math.Abs(twiceArea) * 0.5;
 		}
 
 

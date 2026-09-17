@@ -1,5 +1,5 @@
 FileVersion = 1
-Dependencies = {corlib = "*", bgfx-beef = "*", Chipmunk2D-beef = "*", imguibgfx-beef = "*", jazzutils-beef = "*", JSON_Beef = "*", minicoro-beef = "*", nativefiledialog-beef = "*", ozz-animation-beef = "*", soloud-beef = "*"}
+Dependencies = {corlib = "*", bgfx-beef = "*", imguibgfx-beef = "*", jazzutils-beef = "*", JSON_Beef = "*", minicoro-beef = "*", nativefiledialog-beef = "*", ozz-animation-beef = "*", soloud-beef = "*"}
 
 [Project]
 Name = "gamecore-beef"
