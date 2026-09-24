@@ -39,17 +39,6 @@ class Program
         defer JobSystem.Finalize();
         var resourceDirectory = scope String();
         Directory.GetCurrentDirectory(resourceDirectory);
-        if (Directory.Exists(scope $"{resourceDirectory}/example/buildtime/resources"))
-            resourceDirectory.Append("/example");
-        else if (!Directory.Exists(scope $"{resourceDirectory}/buildtime/resources")
-            && !Directory.Exists(scope $"{resourceDirectory}/runtime/resources"))
-        {
-            var executablePath = scope String();
-            Environment.GetExecutableFilePath(executablePath);
-            var executableDirectory = scope String();
-            Path.GetDirectoryPath(executablePath, executableDirectory);
-            Path.GetFullPath(scope $"{executableDirectory}/../../../example", resourceDirectory..Clear());
-        }
         Console.WriteLine("Example resources: {}", resourceDirectory);
         ResourceManager.Initialize(resourceDirectory, "", 0, 0, true, scope $"{resourceDirectory}/../..");
         defer ResourceManager.Finalize();

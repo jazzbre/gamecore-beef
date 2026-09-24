@@ -4,14 +4,15 @@ The `NGA` branch uses `NoGraphicsAPI-beef` directly from Beef and targets DX12 o
 
 ## Build
 
-Build the native libraries in the sibling dependencies first, including the DX12 branch of `NoGraphicsAPI-beef` and the `NGA` branch of `imgui-nga-beef`. Build the example with Beef, then run it from this repository root with Slang (`slangc`) on PATH:
+Build the native libraries in the sibling dependencies first, including the DX12 branch of `NoGraphicsAPI-beef` and the `NGA` branch of `imgui-nga-beef`. From this repository root, build with Beef, then run from `example/` with Slang (`slangc`) on PATH:
 
 ```bat
 beefbuild -config=Debug -platform=Win64
-build\Debug_Win64\example\example.exe --smoke-test
+cd example
+..\build\Debug_Win64\example\example.exe --smoke-test
 ```
 
-Use `-config=Release` for Release. Building Beef does not compile assets. The example always resolves its development resources under `example/` when launched from the repository root, the example directory, or the build output directory. Its IDE working directory is explicitly set to the example project directory. The smoke test reads pixels back from the GPU and checks meshes, ordered views, depth, texture sampling, debug lines, skinning, sprites, alpha blending, resize, and pipeline cache reuse.
+Use `-config=Release` for Release. Building Beef does not compile assets. The example uses its current working directory as the resource root. Run it from `example/`; the IDE working directory is already set to that project directory. The smoke test reads pixels back from the GPU and checks meshes, ordered views, depth, texture sampling, debug lines, skinning, sprites, alpha blending, resize, and pipeline cache reuse.
 
 The example draws Valmore text above the triangle through `Font.RenderText`. Its `.fnt` and PNG atlas are copied from Bramorr into `example/buildtime/resources/fonts/` and built into hashed runtime assets on startup. The font atlas uses the existing `texturec` tool. The smoke test also compares rendered text pixels against the atlas glyphs.
 
