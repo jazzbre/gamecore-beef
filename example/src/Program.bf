@@ -82,6 +82,7 @@ class Program
 		RenderManager.ProfilingEnabled = true;
 		var context = ImGui.CreateContext();
 		defer ImGui.DestroyContext(context);
+		ImGui.GetIO().ConfigFlags |= .NavEnableKeyboard | .DockingEnable;
 		ImGui.GetIO().IniFilename = null;
 
 		if (!RenderManager.InitializeImGui(window))
@@ -144,6 +145,7 @@ class Program
 			ResourceManager.Update(false);
 			ImGui.NgaNewFrame();
 			ImGui.NewFrame();
+			ImGui.DockSpaceOverViewport(flags: .PassthruCentralNode);
 			ImGui.Begin("GameCore render target");
 			ImGui.TextUnformatted("DX12, GameCore mesh, texture sampling, and shared ImGui heaps");
 			if (RenderManager.HasGpuTiming)
