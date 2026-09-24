@@ -216,7 +216,7 @@ namespace GameCore
 			return true;
 		}
 
-		public void Render(uint16 viewId, Matrix4 _worldMatrix, Shader shader, Vector4* jointMatrices3x4, int jointCount, Vector4 color = .One, Vector4 settings = .Zero, GpuTexture[] textureHandles = null, RenderState? state = null, SamplerDesc? sampler = null, int programIndex = 0)
+		public void Render(RenderCommandBuffer commandBuffer, Matrix4 _worldMatrix, Shader shader, Vector4* jointMatrices3x4, int jointCount, Vector4 color = .One, Vector4 settings = .Zero, GpuTexture[] textureHandles = null, RenderState? state = null, SamplerDesc? sampler = null, int programIndex = 0)
 		{
             var renderState = state.GetValueOrDefault(.DepthTested);
             renderState.Rasterization.cull = RenderManager.GetCullingState(true);
@@ -225,7 +225,7 @@ namespace GameCore
                 var fallback = scope GpuTexture[](subMesh.texture != null ? subMesh.texture.Handle : null);
                 if (subMesh.parts.Count == 0) continue;
                 var part = subMesh.parts[0];
-                RenderManager.Draw(viewId, shader, programIndex, part.vertexBufferHandle, subMesh.indexBufferHandle,
+                RenderManager.Draw(commandBuffer, shader, programIndex, part.vertexBufferHandle, subMesh.indexBufferHandle,
                         (.)part.vertexCount, (.)subMesh.indicesCount, _worldMatrix, color, settings,
                         textureHandles != null ? textureHandles : fallback, renderState, sampler, jointMatrices3x4, jointCount * 3);
             }

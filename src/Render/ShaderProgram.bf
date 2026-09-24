@@ -10,4 +10,6 @@ public class ShaderProgram
     public readonly uint64 Id = (.)Interlocked.Increment(ref nextProgramId);
     public List<uint32> VertexCode = new .() ~ delete _;
     public List<uint32> FragmentCode = new .() ~ delete _;
+    public List<uint32> ComputeCode = new .() ~ delete _;
+    public bool IsCompute => ComputeCode.Count > 0;
 }

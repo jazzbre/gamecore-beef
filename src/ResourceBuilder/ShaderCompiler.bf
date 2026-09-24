@@ -6,12 +6,14 @@ namespace GameCore;
 public enum ShaderStage
 {
     Vertex,
-    Fragment
+    Fragment,
+    Compute
 }
 
 public abstract class ShaderCompiler
 {
     public abstract StringView OutputExtension { get; }
+
     public abstract bool CompileStage(StringView source, StringView entryPoint, ShaderStage stage,
         List<String> defines, List<String> includeDirectories, List<uint8> bytecode, String error);
 
@@ -21,7 +23,11 @@ public abstract class ShaderCompiler
         int backslashes = 0;
         for (char8 character in argument)
         {
-            if (character == '\\') { ++backslashes; continue; }
+            if (character == '\\')
+            {
+                ++backslashes;
+                continue;
+            }
             arguments.Append('\\', character == '"' ? backslashes * 2 + 1 : backslashes);
             arguments.Append(character);
             backslashes = 0;

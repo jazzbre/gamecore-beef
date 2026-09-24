@@ -67,9 +67,9 @@ namespace GameCore
 			DeleteAndNullify!(AnimationList);
 		}
 
-		public void Render(uint16 viewId, Matrix4 _worldMatrix, Shader shader, Vector4* jointMatrices3x4, int jointCount, Vector4 color = .One, Vector4 settings = .Zero, GpuTexture[] textureHandles = null, RenderState? _stateFlags = null, SamplerDesc? _samplerFlags = null, int programIndex = 0)
+		public void Render(RenderCommandBuffer commandBuffer, Matrix4 _worldMatrix, Shader shader, Vector4* jointMatrices3x4, int jointCount, Vector4 color = .One, Vector4 settings = .Zero, GpuTexture[] textureHandles = null, RenderState? _stateFlags = null, SamplerDesc? _samplerFlags = null, int programIndex = 0)
 		{
-			Mesh.Render(viewId, _worldMatrix, shader, jointMatrices3x4, jointCount, color, settings, textureHandles, _stateFlags, _samplerFlags, programIndex);
+			Mesh.Render(commandBuffer, _worldMatrix, shader, jointMatrices3x4, jointCount, color, settings, textureHandles, _stateFlags, _samplerFlags, programIndex);
 		}
 	}
 }

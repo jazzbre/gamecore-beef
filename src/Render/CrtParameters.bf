@@ -1,4 +1,5 @@
 using System;
+
 namespace GameCore;
 [CRepr]
 public struct CrtParameters

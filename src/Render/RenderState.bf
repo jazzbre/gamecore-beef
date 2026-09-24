@@ -11,6 +11,7 @@ public struct RenderState
     public uint8 ColorWriteMask = 15;
 
     public static Self Opaque => .();
+
     public static Self Alpha
     {
         get
@@ -23,6 +24,7 @@ public struct RenderState
             return state;
         }
     }
+
     public static Self Premultiplied
     {
         get
@@ -32,6 +34,7 @@ public struct RenderState
             return state;
         }
     }
+
     public static Self DepthTested
     {
         get
