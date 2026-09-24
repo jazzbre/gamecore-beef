@@ -1,3 +1,4 @@
+using NoGraphicsAPI;
 using System;
 using System.Collections;
 using GameCore;
@@ -59,7 +60,7 @@ namespace ImGui
 		{
 			var idScope = scope IDScope(ref v);
 			var f = float[2](v.x, v.y);
-			if (ImGui.InputFloat2(name.Ptr, f))
+			if (ImGui.InputFloat2(name.Ptr, ref f))
 			{
 				v = .(f[0], f[1]);
 				return true;
@@ -71,7 +72,7 @@ namespace ImGui
 		{
 			var idScope = scope IDScope(ref v);
 			var f = float[3](v.x, v.y, v.z);
-			if (ImGui.InputFloat3(name.Ptr, f))
+			if (ImGui.InputFloat3(name.Ptr, ref f))
 			{
 				v = .(f[0], f[1], f[2]);
 				return true;
@@ -83,7 +84,7 @@ namespace ImGui
 		{
 			var idScope = scope IDScope(ref v);
 			var f = float[4](v.x, v.y, v.z, v.w);
-			if (ImGui.InputFloat4(name.Ptr, f))
+			if (ImGui.InputFloat4(name.Ptr, ref f))
 			{
 				v = .(f[0], f[1], f[2], f[3]);
 				return true;
@@ -95,7 +96,7 @@ namespace ImGui
 		{
 			var idScope = scope IDScope(ref v);
 			var f = float[4](v.r, v.g, v.b, v.a);
-			if (ImGui.ColorEdit4(name.Ptr, f, .HDR))
+			if (ImGui.ColorEdit4(name.Ptr, ref f, .HDR))
 			{
 				v = .(f[0], f[1], f[2], f[3]);
 				return true;
@@ -600,7 +601,7 @@ namespace ImGui
 				var payload = ImGui.AcceptDragDropPayload("Sprite");
 				if (payload != null)
 				{
-					var spritePointer = *((void**)ImGui.GetPayloadData(payload));
+					var spritePointer = *((void**)payload.Data);
 					Log.Info(scope $"Sprite Drop {spritePointer}");
 					sprite = (Sprite)Internal.UnsafeCastToObject(spritePointer);
 				}
@@ -610,7 +611,7 @@ namespace ImGui
 			{
 				float size = ImGui.GetTextLineHeight();
 				ImGui.SameLine();
-				ImGui.Image(ImGui.BgfxGetTextureId(sprite.texture.Handle.idx, ImGui.BgfxTextureFlags.Opaque | ImGui.BgfxTextureFlags.PointSampler), .(size, size), ImGui.Vec2(sprite.uvBounds.x, sprite.uvBounds.y), ImGui.Vec2(sprite.uvBounds.z, sprite.uvBounds.w));
+				ImGui.Image(sprite.texture.Handle.ImageId, .(size, size), ImGui.Vec2(sprite.uvBounds.x, sprite.uvBounds.y), ImGui.Vec2(sprite.uvBounds.z, sprite.uvBounds.w));
 			}
 			return lastSprite != sprite;
 		}

@@ -1,6 +1,6 @@
+using NoGraphicsAPI;
 using System;
 using System.Collections;
-using Bgfx;
 
 namespace GameCore
 {
@@ -20,8 +20,8 @@ namespace GameCore
 		}
 
 		private static Shader shader;
-		private static bgfx.VertexLayout vertexLayout;
-		private static bgfx.VertexLayout cubeVertexLayout;
+		private static VertexLayout vertexLayout;
+		private static VertexLayout cubeVertexLayout;
 
 		private static var debugVertices = new List<DebugVertex>() ~ delete _;
 		private static var debug2DVertices = new List<DebugVertex>() ~ delete _;
@@ -31,8 +31,7 @@ namespace GameCore
 		private static var debug2DTexts = new List<DebugText>() ~ DeleteContainerAndItems!(_);
 		private static var debug3DTexts = new List<DebugText>() ~ DeleteContainerAndItems!(_);
 
-		private static bgfx.VertexBufferHandle cube_vertex_buffer_handle = .Null;
-		private static bgfx.IndexBufferHandle huge_index_buffer = .Null;
+		private static GpuBuffer huge_index_buffer = .Null;
 
 		public static Font DebugFont { get; set; } = null;
 
@@ -234,14 +233,14 @@ namespace GameCore
 		public static bool Initialize()
 		{
 			shader = ResourceManager.GetResource<Shader>("shaders/debug_draw3d");
-			bgfx.vertex_layout_begin(&vertexLayout, bgfx.get_renderer_type());
-			bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.Position, 3, bgfx.AttribType.Float, false, false);
-			bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.TexCoord0, 4, bgfx.AttribType.Uint8, true, false);
-			bgfx.vertex_layout_end(&vertexLayout);
+			vertexLayout.Begin();
+			vertexLayout.Add(VertexAttribute.Position, 3, VertexComponent.Float, false, false);
+			vertexLayout.Add(VertexAttribute.TexCoord0, 4, VertexComponent.Uint8, true, false);
+			vertexLayout.End();
 
-			bgfx.vertex_layout_begin(&cubeVertexLayout, bgfx.get_renderer_type());
-			bgfx.vertex_layout_add(&cubeVertexLayout, bgfx.Attrib.Position, 4, bgfx.AttribType.Float, false, false);
-			bgfx.vertex_layout_end(&cubeVertexLayout);
+			cubeVertexLayout.Begin();
+			cubeVertexLayout.Add(VertexAttribute.Position, 4, VertexComponent.Float, false, false);
+			cubeVertexLayout.End();
 
 			uint32 num_instances  = 64 * 64 * 64;
 
@@ -263,7 +262,7 @@ namespace GameCore
 				let cube_local = i % NUM_CUBE_INDICES;
 				indices[i] = cube_indices[cube_local] + cube * NUM_CUBE_VERTICES;
 			}
-			huge_index_buffer = bgfx.create_index_buffer(bgfx.copy(&indices[0], (uint32)(indices.Count * sizeof(uint32))), (uint16)bgfx.BufferFlags.Index32);
+			huge_index_buffer = GpuBuffer.CreateIndices(&indices[0], (uint32)(indices.Count * sizeof(uint32)), .uint32);
 			return true;
 		}
 
@@ -281,103 +280,43 @@ namespace GameCore
 
 		public static void Render(uint16 viewId, bool render = true, Camera camera = null)
 		{
-			if (!render || (debugVertices.Count == 0 && debug2DVertices.Count == 0 && debug2DTexts.Count == 0 && debug3DTexts.Count == 0 && debugSolidVertices.Count == 0 && debugCubes.Count == 0))
-			{
-				Clear();
-				return;
-			}
-
-			var solidVerticesSize = (uint32)(debugSolidVertices.Count * sizeof(DebugVertex));
-			if (solidVerticesSize > 0)
-			{
-				var tvb = bgfx.TransientVertexBuffer();
-				let availableCount = bgfx.get_avail_transient_vertex_buffer((uint32)debugSolidVertices.Count, &vertexLayout);
-				if (availableCount > 0)
-				{
-					bgfx.alloc_transient_vertex_buffer(&tvb, availableCount, &vertexLayout);
-					solidVerticesSize = (uint32)(availableCount * sizeof(DebugVertex));
-					Internal.MemCpy(tvb.data, &debugSolidVertices[0], (.)solidVerticesSize);
-					var stateFlags = bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | (camera != null ? camera.DepthTest : bgfx.StateFlags.DepthTestLequal) | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
-					var identity = Matrix4.Identity;
-					bgfx.set_transform(identity.Ptr(), 1);
-					bgfx.set_state((uint64)stateFlags, 0);
-					bgfx.set_transient_vertex_buffer(0, &tvb, 0, (uint32)availableCount);
-					bgfx.submit(viewId, shader.Programs[0], 0, (uint8)bgfx.DiscardFlags.All);
-					++RenderManager.statistics.submitCount;
-				}
-			}
-
-			var verticesSize = (uint32)(debugVertices.Count * sizeof(DebugVertex));
-			if (verticesSize > 0)
-			{
-				var tvb = bgfx.TransientVertexBuffer();
-				let availableCount = bgfx.get_avail_transient_vertex_buffer((uint32)debugVertices.Count, &vertexLayout);
-				if (availableCount > 0)
-				{
-					bgfx.alloc_transient_vertex_buffer(&tvb, availableCount, &vertexLayout);
-					verticesSize = (uint32)(availableCount * sizeof(DebugVertex));
-					Internal.MemCpy(tvb.data, &debugVertices[0], (.)verticesSize);
-					var stateFlags = bgfx.StateFlags.PtLines | bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | (camera != null ? camera.DepthTest : bgfx.StateFlags.DepthTestLequal) | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
-					var identity = Matrix4.Identity;
-					bgfx.set_transform(identity.Ptr(), 1);
-					bgfx.set_state((uint64)stateFlags, 0);
-					bgfx.set_transient_vertex_buffer(0, &tvb, 0, availableCount);
-					bgfx.submit(viewId, shader.Programs[0], 0, (uint8)bgfx.DiscardFlags.All);
-					++RenderManager.statistics.submitCount;
-				}
-			}
-
-			let cubeVerticesSize = (uint32)(debugCubes.Count * sizeof(Vector4));
-			if (cubeVerticesSize > 0)
-			{
-				if (cube_vertex_buffer_handle.Valid)
-				{
-					bgfx.destroy_vertex_buffer(cube_vertex_buffer_handle);
-				}
-				cube_vertex_buffer_handle = bgfx.create_vertex_buffer(bgfx.copy(&debugCubes[0], (.)cubeVerticesSize), &cubeVertexLayout, (uint16)bgfx.BufferFlags.ComputeRead);
-				var stateFlags = bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.WriteZ | (camera != null ? camera.DepthTest : bgfx.StateFlags.DepthTestLequal) | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
-				var identity = Matrix4.Identity;
-				bgfx.set_transform(identity.Ptr(), 1);
-				bgfx.set_state((uint64)stateFlags, 0);
-				bgfx.set_compute_vertex_buffer(0, cube_vertex_buffer_handle, bgfx.Access.Read);
-				uint32 instanceCount = ((uint32)debugCubes.Count / 2);
-				bgfx.set_index_buffer(huge_index_buffer, 0, instanceCount * NUM_CUBE_INDICES);
-				bgfx.set_vertex_count(instanceCount * 8);
-				bgfx.submit(viewId, shader.Programs[1], 0, (uint8)bgfx.DiscardFlags.All);
-				++RenderManager.statistics.submitCount;
-			}
-
-			let screenVerticesSize = (uint32)(debug2DVertices.Count * sizeof(DebugVertex));
-			if (screenVerticesSize > 0)
-			{
-				var screenVertexBuffer = bgfx.TransientVertexBuffer();
-				let availableCount = bgfx.get_avail_transient_vertex_buffer((uint32)debug2DVertices.Count, &vertexLayout);
-				if (availableCount > 0)
-				{
-					bgfx.alloc_transient_vertex_buffer(&screenVertexBuffer, (uint32)availableCount, &vertexLayout);
-					Internal.MemCpy(screenVertexBuffer.data, &debug2DVertices[0], (.)screenVerticesSize);
-					var stateFlags = bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.blend_function(bgfx.StateFlags.BlendSrcAlpha, bgfx.StateFlags.BlendInvSrcAlpha);
-					var identity = Matrix4.Identity;
-					bgfx.set_transform(identity.Ptr(), 1);
-					bgfx.set_state((uint64)stateFlags, 0);
-					bgfx.set_transient_vertex_buffer(0, &screenVertexBuffer, 0, (uint32)availableCount);
-					bgfx.submit(viewId, shader.Programs[2], 0, (uint8)bgfx.DiscardFlags.All);
-					++RenderManager.statistics.submitCount;
-				}
-			}
-
-			for (var debugText in debug2DTexts)
-			{
-				RenderText(viewId, debugText, 0);
-			}
-			for (var debugText in debug3DTexts)
-			{
-				RenderText(viewId, debugText, 1);
-			}
-			Clear();
+            if (!render) { Clear(); return; }
+            var state = RenderState.DepthTested;
+            state.Blend = RenderState.Premultiplied.Blend;
+            if (camera != null) state.Depth.depth_compare = camera.DepthTest;
+            if (debugSolidVertices.Count > 0)
+            {
+                var vertices = RenderManager.Context.TransientVertices(debugSolidVertices.Ptr, (uint32)(debugSolidVertices.Count * sizeof(DebugVertex)), vertexLayout);
+                RenderManager.Draw(viewId, shader, 0, vertices, default, (.)debugSolidVertices.Count, 0, .Identity, .One, .Zero, state: state);
+            }
+            if (debugVertices.Count > 0)
+            {
+                var vertices = RenderManager.Context.TransientVertices(debugVertices.Ptr, (uint32)(debugVertices.Count * sizeof(DebugVertex)), vertexLayout);
+                RenderManager.Draw(viewId, shader, 0, vertices, default, (.)debugVertices.Count, 0, .Identity, .One, .Zero, state: state, lines: true);
+            }
+            if (debugCubes.Count > 0)
+            {
+                var storage = RenderManager.Context.Upload(debugCubes.Ptr, (uint64)(debugCubes.Count * sizeof(Vector4)));
+                uint32 count = (uint32)debugCubes.Count / 2;
+                RenderManager.Draw(viewId, shader, 1, default, huge_index_buffer, count * 8, count * NUM_CUBE_INDICES, .Identity, .One, .Zero, state: state, storage: storage);
+            }
+            if (debug2DVertices.Count > 0)
+            {
+                var vertices = RenderManager.Context.TransientVertices(debug2DVertices.Ptr, (uint32)(debug2DVertices.Count * sizeof(DebugVertex)), vertexLayout);
+                RenderManager.Draw(viewId, shader, 2, vertices, default, (.)debug2DVertices.Count, 0, .Identity, .One, .Zero, state: .Alpha);
+            }
+            for (var text in debug2DTexts) RenderText(viewId, text, 0);
+            for (var text in debug3DTexts) RenderText(viewId, text, 1);
+            Clear();
 		}
 
-		public static void Clear()
+        public static void Finalize()
+        {
+            huge_index_buffer.Dispose(); huge_index_buffer = .Null;
+            Clear();
+        }
+
+        public static void Clear()
 		{
 			debugVertices.Clear();
 			debug2DVertices.Clear();

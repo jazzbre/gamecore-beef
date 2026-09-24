@@ -1,8 +1,8 @@
+using NoGraphicsAPI;
 using System;
 using System.Collections;
 using System.IO;
 using System.Diagnostics;
-using Bgfx;
 
 namespace GameCore
 {
@@ -67,7 +67,7 @@ namespace GameCore
 			DeleteAndNullify!(AnimationList);
 		}
 
-		public void Render(uint16 viewId, Matrix4 _worldMatrix, Shader shader, Vector4* jointMatrices3x4, int jointCount, Vector4 color = .One, Vector4 settings = .Zero, bgfx.TextureHandle[] textureHandles = null, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int programIndex = 0)
+		public void Render(uint16 viewId, Matrix4 _worldMatrix, Shader shader, Vector4* jointMatrices3x4, int jointCount, Vector4 color = .One, Vector4 settings = .Zero, GpuTexture[] textureHandles = null, RenderState? _stateFlags = null, SamplerDesc? _samplerFlags = null, int programIndex = 0)
 		{
 			Mesh.Render(viewId, _worldMatrix, shader, jointMatrices3x4, jointCount, color, settings, textureHandles, _stateFlags, _samplerFlags, programIndex);
 		}

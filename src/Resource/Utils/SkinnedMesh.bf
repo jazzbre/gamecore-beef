@@ -1,8 +1,8 @@
+using NoGraphicsAPI;
 using System;
 using System.Collections;
 using System.IO;
 using System.Diagnostics;
-using Bgfx;
 
 namespace GameCore
 {
@@ -10,14 +10,14 @@ namespace GameCore
 	{
 		public class Part
 		{
-			public bgfx.VertexLayout vertexLayout;
-			public bgfx.VertexBufferHandle vertexBufferHandle;
+			public VertexLayout vertexLayout;
+			public GpuBuffer vertexBufferHandle;
 			public int vertexCount = 0;
 
 			public ~this()
 			{
-				bgfx.destroy_vertex_buffer(vertexBufferHandle);
-				vertexBufferHandle.idx = uint16.MaxValue;
+				vertexBufferHandle.Dispose();
+				vertexBufferHandle = .Null;
 			}
 
 			public bool Load(Stream stream, ref Bounds3 bounds)
@@ -38,37 +38,37 @@ namespace GameCore
 				defer delete jointWeights;
 				// Create layeout
 				vertexCount = positions.Count / 3;
-				bgfx.vertex_layout_begin(&vertexLayout, bgfx.get_renderer_type());
-				bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.Position, 3, bgfx.AttribType.Float, false, false);
+				vertexLayout.Begin();
+				vertexLayout.Add(VertexAttribute.Position, 3, VertexComponent.Float, false, false);
 				if (normals != null)
 				{
-					bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.Normal, 3, bgfx.AttribType.Float, false, false);
+					vertexLayout.Add(VertexAttribute.Normal, 3, VertexComponent.Float, false, false);
 				}
 				if (tangents != null)
 				{
-					bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.Tangent, 4, bgfx.AttribType.Float, false, false);
+					vertexLayout.Add(VertexAttribute.Tangent, 4, VertexComponent.Float, false, false);
 				}
 				if (uvs != null)
 				{
-					bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.TexCoord0, 2, bgfx.AttribType.Float, false, false);
+					vertexLayout.Add(VertexAttribute.TexCoord0, 2, VertexComponent.Float, false, false);
 				}
 				if (colors != null)
 				{
-					bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.Color0, 4, bgfx.AttribType.Uint8, true, false);
+					vertexLayout.Add(VertexAttribute.Color0, 4, VertexComponent.Uint8, true, false);
 				}
 				int indicesPerVertex = 0;
 				int weightsPerVertex = 0;
 				if (jointIndices != null)
 				{
 					indicesPerVertex = jointIndices.Count / vertexCount;
-					bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.Indices, 4, bgfx.AttribType.Uint8, true, false);
-					bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.Weight, 4, bgfx.AttribType.Float, false, false);
+					vertexLayout.Add(VertexAttribute.Indices, 4, VertexComponent.Uint8, true, false);
+					vertexLayout.Add(VertexAttribute.Weight, 4, VertexComponent.Float, false, false);
 					if (jointWeights != null)
 					{
 						weightsPerVertex = jointWeights.Count / vertexCount;
 					}
 				}
-				bgfx.vertex_layout_end(&vertexLayout);
+				vertexLayout.End();
 				// Fill buffer
 				uint8[] vertices = new .[vertexLayout.stride * vertexCount];
 				defer delete vertices;
@@ -131,7 +131,7 @@ namespace GameCore
 						vertexOffset += 16;
 					}
 				}
-				vertexBufferHandle = bgfx.create_vertex_buffer(bgfx.copy(&vertices[0], (uint32)vertices.Count), &vertexLayout, 0);
+				vertexBufferHandle = GpuBuffer.CreateVertices(&vertices[0], (uint32)vertices.Count, vertexLayout);
 				return true;
 			}
 		}
@@ -142,14 +142,14 @@ namespace GameCore
 			public uint16[] jointRemaps = null ~ delete _;
 			public Matrix4[] inverseBindMatrices = null ~ delete _;
 			public int indicesCount = 0;
-			public bgfx.IndexBufferHandle indexBufferHandle;
-			public Texture texture;
+			public GpuBuffer indexBufferHandle;
+			public GameCore.Texture texture;
 			public Bounds3 bounds = .();
 
 			public ~this()
 			{
-				bgfx.destroy_index_buffer(indexBufferHandle);
-				indexBufferHandle.idx = uint16.MaxValue;
+				indexBufferHandle.Dispose();
+				indexBufferHandle = .Null;
 			}
 
 			public bool Load(Stream stream)
@@ -171,7 +171,7 @@ namespace GameCore
 				indicesCount = triangleIndices.Count;
 				jointRemaps = ReadArray<uint16>(stream);
 				inverseBindMatrices = ReadArray<Matrix4>(stream);
-				indexBufferHandle = bgfx.create_index_buffer(bgfx.copy(&triangleIndices[0], (uint32)(triangleIndices.Count * sizeof(uint16))), 0);
+				indexBufferHandle = GpuBuffer.CreateIndices(&triangleIndices[0], (uint32)(triangleIndices.Count * sizeof(uint16)));
 				return true;
 			}
 		}
@@ -216,42 +216,22 @@ namespace GameCore
 			return true;
 		}
 
-		public void Render(uint16 viewId, Matrix4 _worldMatrix, Shader shader, Vector4* jointMatrices3x4, int jointCount, Vector4 color = .One, Vector4 settings = .Zero, bgfx.TextureHandle[] textureHandles = null, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int programIndex = 0)
+		public void Render(uint16 viewId, Matrix4 _worldMatrix, Shader shader, Vector4* jointMatrices3x4, int jointCount, Vector4 color = .One, Vector4 settings = .Zero, GpuTexture[] textureHandles = null, RenderState? state = null, SamplerDesc? sampler = null, int programIndex = 0)
 		{
-			var stateFlags = _stateFlags != 0 ? _stateFlags : bgfx.StateFlags.WriteRgb | .WriteA | .WriteZ | .DepthTestLequal | RenderManager.GetCullingState(true);
-			var samplerFlags = _samplerFlags != 0 ? (uint32)_samplerFlags : (uint32)(bgfx.SamplerFlags.UClamp | bgfx.SamplerFlags.VClamp);
-				// Render
-			var worldMatrix = _worldMatrix;
-			for (var subMesh in subMeshes)
-			{
-				let part = subMesh.parts[0];
-				bgfx.set_transform(worldMatrix.Ptr(), 1);
-				bgfx.set_state((uint64)stateFlags, 0);
-				var shaderData = RenderManager.ShaderData;
-				bgfx.set_uniform(RenderManager.timeUniformHandle, &shaderData.x, 1);
-				var _color = color;
-				bgfx.set_uniform(RenderManager.colorUniformHandle, &_color.x, 1);
-				var _settings = settings;
-				bgfx.set_uniform(RenderManager.settingsUniformHandle, &_settings.x, 1);
-				bgfx.set_uniform(RenderManager.instanceDataUniformHandle, jointMatrices3x4, (uint16)jointCount * 3);
-				bgfx.set_vertex_buffer(0, part.vertexBufferHandle, 0, (uint32)part.vertexCount);
-				bgfx.set_index_buffer(subMesh.indexBufferHandle, 0, (uint32)subMesh.indicesCount);
-				if (textureHandles != null)
-				{
-					for (int i = 0; i < textureHandles.Count; ++i)
-					{
-						bgfx.set_texture((uint8)i, RenderManager.textureUniformHandles[i], textureHandles[i], samplerFlags);
-					}
-				} else if (subMesh.texture != null)
-				{
-					bgfx.set_texture(0, RenderManager.textureUniformHandles[0], subMesh.texture.Handle, samplerFlags);
-				}
-				bgfx.submit(viewId, shader.Programs[programIndex], 0, (uint8)bgfx.DiscardFlags.All);
-				++RenderManager.statistics.submitCount;
-			}
+            var renderState = state.GetValueOrDefault(.DepthTested);
+            renderState.Rasterization.cull = RenderManager.GetCullingState(true);
+            for (var subMesh in subMeshes)
+            {
+                var fallback = scope GpuTexture[](subMesh.texture != null ? subMesh.texture.Handle : null);
+                if (subMesh.parts.Count == 0) continue;
+                var part = subMesh.parts[0];
+                RenderManager.Draw(viewId, shader, programIndex, part.vertexBufferHandle, subMesh.indexBufferHandle,
+                        (.)part.vertexCount, (.)subMesh.indicesCount, _worldMatrix, color, settings,
+                        textureHandles != null ? textureHandles : fallback, renderState, sampler, jointMatrices3x4, jointCount * 3);
+            }
 		}
 
-		public void SetTexture(Texture texture)
+		public void SetTexture(GameCore.Texture texture)
 		{
 			for (var subMesh in subMeshes)
 			{

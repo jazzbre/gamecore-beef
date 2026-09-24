@@ -1,8 +1,8 @@
+using NoGraphicsAPI;
 using System;
 using System.Collections;
 using System.IO;
 using System.Diagnostics;
-using Bgfx;
 
 namespace GameCore
 {
@@ -24,7 +24,7 @@ namespace GameCore
 		[JSON_Beef.Serialized]
 		public Color averageColor = .White;
 
-		public Texture texture;
+		public GameCore.Texture texture;
 		public int index;
 		public Vector3 size;
 		public Vector4 uvBounds = .Zero;
@@ -196,7 +196,7 @@ namespace GameCore
 	[Reflect(.Methods), AlwaysInclude(AssumeInstantiated = true, IncludeAllMethods = true)]
 	public class Texture : Resource
 	{
-		public bgfx.TextureHandle Handle { get; private set; }
+		public GpuTexture Handle { get; private set; }
 		public int Width { get; private set; };
 		public int Height { get; private set; }
 		public Vector2 Size { get; private set; }
@@ -214,14 +214,34 @@ namespace GameCore
 			{
 				return;
 			}
-			var memory = bgfx.copy(binaryFile.Ptr, (uint32)binaryFile.Length);
-			var info = bgfx.TextureInfo();
-			Handle = bgfx.create_texture(memory, 0, 0, &info);
-
-			if (Handle.Valid)
-			{
-				Width = (int)info.width;
-				Height = (int)info.height;
+            if (binaryFile.Length < 68) return;
+            uint32* header = (.)binaryFile.Ptr;
+            // texturec also writes RGBA8 KTX files with zero glType and glFormat.
+            bool rgbaPixels = (header[4] == 0x1401 && header[6] == 0x1908) || (header[4] == 0 && header[6] == 0);
+            if (header[0] != 0x58544BAB || header[1] != 0xBB313120 || header[2] != 0x0A1A0A0D
+                || header[3] != 0x04030201 || !rgbaPixels || header[5] != 1 || header[8] != 0x1908
+                || (header[7] != 0x8058 && header[7] != 0x8C43)
+                || header[11] != 0 || header[12] != 0 || header[13] != 1) return;
+            Width = (.)header[9]; Height = (.)header[10];
+            if (Width <= 0 || Height <= 0) return;
+            uint32 mipCount = (.)Math.Max(1U, header[14]);
+            uint32 maxMipCount = 1;
+            for (int dimension = Math.Max(Width, Height); dimension > 1; dimension >>= 1) ++maxMipCount;
+            if (mipCount > maxMipCount) return;
+            uint64 offset = 64UL + header[15];
+            var pixels = scope List<uint8>();
+            for (uint32 mip = 0; mip < mipCount; ++mip)
+            {
+                uint64 byteCount = (uint64)Math.Max(1, Width >> (int)mip) * (uint64)Math.Max(1, Height >> (int)mip) * 4;
+                if (offset + 4 + byteCount > (uint64)binaryFile.Length || byteCount > uint32.MaxValue) return;
+                if (*(uint32*)(binaryFile.Ptr + offset) != byteCount) return;
+                pixels.AddRange(.((uint8*)binaryFile.Ptr + offset + 4, (.)byteCount));
+                offset += 4 + byteCount;
+            }
+            Format format = header[7] == 0x8C43 ? .rgba8_srgb : .rgba8_unorm;
+            Handle = new GpuTexture((.)Width, (.)Height, format, .sampled, pixels.Ptr, (.)pixels.Count, mipCount);
+            if (Handle != null)
+            {
 				Size = .((float)Width, (float)Height);
 				ooSize = .One / Size;
 
@@ -267,13 +287,14 @@ namespace GameCore
 
 		protected override void OnUnload()
 		{
-			for (var sprite in SpriteAtlas.sprites)
+			if (SpriteAtlas != null) for (var sprite in SpriteAtlas.sprites)
 			{
 				Sprite.spriteMap.Remove(sprite.name);
 			}
-			delete SpriteAtlas;
-			delete SpriteData;
-			bgfx.destroy_texture(Handle);
+			delete SpriteAtlas; SpriteAtlas = null;
+			delete SpriteData; SpriteData = null;
+            textureSpriteMap.Clear();
+			delete Handle; Handle = null;
 		}
 
 		public Sprite FindSprite(StringView name)

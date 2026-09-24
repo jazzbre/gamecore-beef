@@ -1,6 +1,6 @@
+using NoGraphicsAPI;
 using System;
 using System.IO;
-using Bgfx;
 using System.Collections;
 
 namespace GameCore
@@ -25,8 +25,8 @@ namespace GameCore
 		public bool UseReversedDepth = false;
 		public bool IsReversedDepth => UseReversedDepth && !IsDepthOnly;
 		public float DepthClearValue => IsReversedDepth ? 0.0f : 1.0f;
-		public bgfx.StateFlags DepthTest => IsReversedDepth ? .DepthTestGequal : .DepthTestLequal;
-		public static bool HomogeneousDepth => bgfx.get_caps() != null && bgfx.get_caps().homogeneousDepth != 0;
+		public CompareOp DepthTest => IsReversedDepth ? .greater_equal : .less_equal;
+		public static bool HomogeneousDepth => false;
 
 		public Vector3 position = .Zero;
 		public Quaternion rotation = .Identity;

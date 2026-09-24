@@ -1,8 +1,8 @@
+using NoGraphicsAPI;
 using System;
 using System.Collections;
 using System.IO;
 using System.Diagnostics;
-using Bgfx;
 
 namespace GameCore
 {
@@ -47,27 +47,27 @@ namespace GameCore
 		public class Group
 		{
 			public String name = new String() ~ delete _;
-			public bgfx.VertexBufferHandle m_vbh;
-			public bgfx.IndexBufferHandle m_ibh;
+			public GpuBuffer m_vbh;
+			public GpuBuffer m_ibh;
 			public uint16 m_numVertices;
 			public uint32 m_numIndices;
 			public Sphere m_sphere;
 			public Aabb m_aabb;
 			public Obb m_obb;
 			public List<Primitive> m_prims = new List<Primitive>() ~ delete _;
-			public Texture texture;
+			public GameCore.Texture texture;
 
 			public ~this()
 			{
-				bgfx.destroy_vertex_buffer(m_vbh);
-				bgfx.destroy_index_buffer(m_ibh);
+				m_vbh.Dispose();
+				m_ibh.Dispose();
 			}
 		}
 
-		public bgfx.VertexLayout vertexLayout;
+		public VertexLayout vertexLayout;
 		private List<Group> groups = new List<Group>() ~ DeleteContainerAndItems!(_);
 
-		public bgfx.VertexLayout VertexLayout => vertexLayout;
+		public VertexLayout VertexLayout => vertexLayout;
 		public List<Group> Groups => groups;
 
 		public bool Load(StringView fileName)
@@ -104,7 +104,7 @@ namespace GameCore
 					let stride = vertexLayout.stride;
 					var vertices = scope uint8[(int)group.m_numVertices * (int)stride];
 					binaryFile.TryRead(vertices).IgnoreError();
-					group.m_vbh = bgfx.create_vertex_buffer(bgfx.copy(&vertices[0], (uint32)vertices.Count), &vertexLayout, 0);
+					group.m_vbh = GpuBuffer.CreateVertices(&vertices[0], (uint32)vertices.Count, vertexLayout);
 					break;
 				case kChunkIndexBuffer:
 					if (group == null)
@@ -114,7 +114,7 @@ namespace GameCore
 					group.m_numIndices = binaryFile.Read<uint32>().Value;
 					var indices = scope uint8[sizeof(uint16) * (int)group.m_numIndices];
 					binaryFile.TryRead(indices).IgnoreError();
-					group.m_ibh = bgfx.create_index_buffer(bgfx.copy(&indices[0], (uint32)indices.Count), 0);
+					group.m_ibh = GpuBuffer.CreateIndices(&indices[0], (uint32)indices.Count);
 					break;
 				case kChunkPrimitive:
 					SystemUtils.ReadStrSized16(binaryFile, group.name);
@@ -141,7 +141,7 @@ namespace GameCore
 			return true;
 		}
 
-		public void SetTexture(Texture texture)
+		public void SetTexture(GameCore.Texture texture)
 		{
 			for (var group in groups)
 			{

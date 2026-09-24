@@ -1,6 +1,6 @@
+using NoGraphicsAPI;
 using System;
 using System.Collections;
-using Bgfx;
 
 namespace GameCore
 {
@@ -19,7 +19,7 @@ namespace GameCore
 		}
 
 		private static Shader shader;
-		private static bgfx.VertexLayout vertexLayout;
+		private static VertexLayout vertexLayout;
 
 		private static var debugVertices = new List<DebugVertex>() ~ delete _;
 		private static var debugIndices = new List<uint16>() ~ delete _;
@@ -166,41 +166,25 @@ namespace GameCore
 		public static bool Initialize()
 		{
 			shader = ResourceManager.GetResource<Shader>("shaders/debug_draw");
-			bgfx.vertex_layout_begin(&vertexLayout, bgfx.get_renderer_type());
-			bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.Position, 2, bgfx.AttribType.Float, false, false);
-			bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.TexCoord0, 3, bgfx.AttribType.Float, false, false);
-			bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.TexCoord1, 4, bgfx.AttribType.Uint8, true, false);
-			bgfx.vertex_layout_add(&vertexLayout, bgfx.Attrib.TexCoord2, 4, bgfx.AttribType.Uint8, true, false);
-			bgfx.vertex_layout_end(&vertexLayout);
+			vertexLayout.Begin();
+			vertexLayout.Add(VertexAttribute.Position, 2, VertexComponent.Float, false, false);
+			vertexLayout.Add(VertexAttribute.TexCoord0, 3, VertexComponent.Float, false, false);
+			vertexLayout.Add(VertexAttribute.TexCoord1, 4, VertexComponent.Uint8, true, false);
+			vertexLayout.Add(VertexAttribute.TexCoord2, 4, VertexComponent.Uint8, true, false);
+			vertexLayout.End();
 			return true;
 		}
 
 		public static void Render(uint16 viewId, bool render = true)
 		{
-			if (!render || debugVertices.Count == 0 || debugIndices.Count == 0)
-			{
-				debugVertices.Clear();
-				debugIndices.Clear();
-				return;
-			}
-			var tvb = bgfx.TransientVertexBuffer();
-			let verticesSize = (uint32)(debugVertices.Count * sizeof(DebugVertex));
-			bgfx.alloc_transient_vertex_buffer(&tvb, (uint32)debugVertices.Count, &vertexLayout);
-			Internal.MemCpy(tvb.data, &debugVertices[0], (.)verticesSize);
-			var tib = bgfx.TransientIndexBuffer();
-			let indicesSize = (uint32)(debugIndices.Count * sizeof(uint16));
-			bgfx.alloc_transient_index_buffer(&tib, indicesSize, false);
-			Internal.MemCpy(tib.data, &debugIndices[0], (.)indicesSize);
-			var stateFlags = bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.DepthTestAlways | bgfx.blend_function(bgfx.StateFlags.BlendOne, bgfx.StateFlags.BlendInvSrcAlpha);
-			var identity = Matrix4.Identity;
-			bgfx.set_transform(identity.Ptr(), 1);
-			bgfx.set_state((uint64)stateFlags, 0);
-			bgfx.set_transient_vertex_buffer(0, &tvb, 0, (uint32)debugVertices.Count);
-			bgfx.set_transient_index_buffer(&tib, 0, (uint32)debugIndices.Count);
-			bgfx.submit(viewId, shader.Programs[0], 0, (uint8)bgfx.DiscardFlags.All);
-			++RenderManager.statistics.submitCount;
-			debugVertices.Clear();
-			debugIndices.Clear();
+            if (render && debugVertices.Count > 0 && debugIndices.Count > 0)
+            {
+                var vertices = RenderManager.Context.TransientVertices(debugVertices.Ptr, (uint32)(debugVertices.Count * sizeof(DebugVertex)), vertexLayout);
+                var indices = RenderManager.Context.TransientIndices(debugIndices.Ptr, (uint32)(debugIndices.Count * sizeof(uint16)));
+                RenderManager.Draw(viewId, shader, 0, vertices, indices, (.)debugVertices.Count, (.)debugIndices.Count,
+                    .Identity, .One, .Zero, state: .Premultiplied);
+            }
+            debugVertices.Clear(); debugIndices.Clear();
 		}
 
 	}

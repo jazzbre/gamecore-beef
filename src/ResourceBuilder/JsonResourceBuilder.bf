@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 
 namespace GameCore
 {
@@ -12,8 +13,7 @@ namespace GameCore
 		public override bool OnBuild(StringView path, StringView hash)
 		{
 			var jsonPath = scope String()..AppendF("{}{}.json", ResourceManager.runtimeResourcesPath, hash);
-			SystemUtils.FileCopy(path, jsonPath, true);
-			return default;
+            return File.Copy(path, jsonPath) case .Ok;
 		}
 
 		public override bool OnCheckBuild(StringView path, StringView hash)

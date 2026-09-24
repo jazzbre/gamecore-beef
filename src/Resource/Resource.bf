@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.IO;
 using System.Diagnostics;
-using Bgfx;
 
 namespace GameCore
 {

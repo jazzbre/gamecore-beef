@@ -3,7 +3,6 @@ using System.Collections;
 using System.IO;
 using System.Diagnostics;
 using System.Threading;
-using Bgfx;
 using jazzutils;
 
 namespace GameCore
@@ -18,12 +17,12 @@ namespace GameCore
 		public static String buildtimeResourcesPath ~ delete _;
 		public static String buildtimeToolsPath ~ delete _;
 		public static String buildtimeBgfxToolsPath ~ delete _;
-		public static String buildtimeShaderIncludePath ~ delete _;
+		public static String buildtimeNgaShaderIncludePath ~ delete _;
 		public static String buildtimeTemporaryPath ~ delete _;
-		private static bool canBuild = true;
+		private static bool canBuild = false;
 
 		private static FileSystemWatcher buildResourcesWatched = null ~ delete _;
-		private static Dictionary<String, Resource> resourceMap = new Dictionary<String, Resource>();
+		private static Dictionary<String, Resource> resourceMap = new Dictionary<String, Resource>() ~ delete _;
 		private static Dictionary<Type, List<Resource>> resourceByTypeMap = new Dictionary<Type, List<Resource>>() ~ DestroyResourcesByType();
 		private static List<ResourceBuilder> resourceBuilders = new List<ResourceBuilder>() ~ DestroyResourceBuilders();
 		private static HashSet<String> queueResourceFiles = new HashSet<String>() ~ delete _;
@@ -33,21 +32,21 @@ namespace GameCore
 
 		public static Dictionary<Type, List<Resource>> ResourcesByType => resourceByTypeMap;
 
-		private static Monitor buildResourceLock = null ~ delete _;
+		private static Monitor buildResourceLock = new .() ~ delete _;
 		private static List<Resource> queuedResources = new .() ~ delete _;
 		private static Job loadResourcesJob = null;
 
 		#if BF_PLATFORM_WINDOWS
-		const String ToolsPath = "/../bgfx-beef/submodules/bgfx/.build/win64_vs2022/bin/";
-		const String ToolsPath2 = "/../bgfx-beef/submodules/bgfx/.build/win64_vs2019/bin/";
+		const String ToolsPath = "/bgfx-beef/submodules/bgfx/.build/win64_vs2022/bin/";
+		const String ToolsPath2 = "/bgfx-beef/submodules/bgfx/.build/win64_vs2019/bin/";
 		public static ResourceBuilderPlatform ActiveResourceBuilderPlatform = .Windows;
 			#elif BF_PLATFORM_MACOS
-		const String ToolsPath = "/../bgfx-beef/submodules/bgfx/.build/osx-x64/bin/";
-		const String ToolsPath2 = "/../bgfx-beef/submodules/bgfx/.build/osx-x64/bin/";
+		const String ToolsPath = "/bgfx-beef/submodules/bgfx/.build/osx-x64/bin/";
+		const String ToolsPath2 = "/bgfx-beef/submodules/bgfx/.build/osx-x64/bin/";
 		public static ResourceBuilderPlatform ActiveResourceBuilderPlatform = .macOS;
 			#elif BF_PLATFORM_LINUX
-		const String ToolsPath = "/../bgfx-beef/submodules/bgfx/.build/linux64_gcc/bin/";
-		const String ToolsPath2 = "/../bgfx-beef/submodules/bgfx/.build/osx64_clang/bin/";
+		const String ToolsPath = "/bgfx-beef/submodules/bgfx/.build/linux64_gcc/bin/";
+		const String ToolsPath2 = "/bgfx-beef/submodules/bgfx/.build/osx64_clang/bin/";
 		public static ResourceBuilderPlatform ActiveResourceBuilderPlatform = .Linux;
 		#else
 		public static ResourceBuilderPlatform ActiveResourceBuilderPlatform = .Last;
@@ -90,7 +89,7 @@ namespace GameCore
 				pair.value.Unload();
 				delete pair.value;
 			}
-			delete resourceMap;
+			resourceMap.Clear();
 		}
 
 		private static void DestroyResourceBuilders()
@@ -104,6 +103,7 @@ namespace GameCore
 
 		public static void Finalize()
 		{
+			DeleteAndNullify!(buildResourcesWatched);
 			buildResourceLock.Enter();
 			for (var fileName in queueResourceFiles)
 			{
@@ -119,6 +119,7 @@ namespace GameCore
 			buildResourceLock.Enter();
 			var fileName = scope String(buildtimeResourcesPath);
 			fileName.Append(_fileName);
+			if (fileName.EndsWith(".slang.json")) fileName.RemoveFromEnd(5);
 			var newFileName = new String(fileName);
 			if (!queueResourceFiles.Contains(newFileName))
 			{
@@ -167,6 +168,15 @@ namespace GameCore
 
 		private static bool BuildResource(StringView filename, bool force = false, bool update = true)
 		{
+			if (filename.EndsWith(".slang.json")) return false;
+			if (ShaderBuilder.IsSharedInclude(filename))
+			{
+				bool shadersBuilt = false;
+				if (resourceByTypeMap.TryGetValue(typeof(Shader), let shaders))
+					for (var shader in shaders)
+						shadersBuilt |= BuildResource(scope $"{buildtimeResourcesPath}{shader.Name}.slang", false, update);
+				return shadersBuilt;
+			}
 			var wasBuilt = false;
 			var relativePath = scope String(filename);
 			relativePath.Remove(0, buildtimeResourcesPath.Length);
@@ -196,13 +206,13 @@ namespace GameCore
 					if (update)
 					{
 						wasLoaded = resource.IsLoaded;
-						resource.Unload();
 					}
 				} else
 				{
 					if (AddResource(builder.ResourceType, relativePath, hashString))
 					{
 						Log.Info("Resource {} added!", relativePath);
+						resourceBuilt = true;
 					} else
 					{
 						Log.Info("Resource {} failed!", relativePath);
@@ -214,11 +224,12 @@ namespace GameCore
 					continue;
 				}
 				Log.Info("Building {}...", filename);
-				builder.Build(filename, hashString);
+				if (!builder.Build(filename, hashString)) continue;
 				wasBuilt = true;
 				resourceBuilt = true;
 				if (wasLoaded)
 				{
+					resource.Unload();
 					resource.Load();
 				}
 			}
@@ -260,37 +271,18 @@ namespace GameCore
 			}
 		}
 
-		private static void InitializeRuntimeBuild(String path)
+		private static void InitializeRuntimeBuild(StringView dependencyRoot)
 		{
 #if RESOURCEBUILD
 			canBuild = System.IO.Directory.Exists(buildtimeResourcesPath);
-			// Find tools (either VS2019 or VS2017)
-			if (canBuild)
+			buildtimeBgfxToolsPath.Append(ToolsPath);
+			if (!Directory.Exists(buildtimeBgfxToolsPath))
 			{
-				buildtimeBgfxToolsPath.Append(ToolsPath);
-				if (!System.IO.Directory.Exists(buildtimeBgfxToolsPath))
-				{
-					canBuild = false;
-				}
-				if (!canBuild)
-				{
-					buildtimeBgfxToolsPath.Clear();
-					buildtimeBgfxToolsPath.Append(ToolsPath2);
-					if (!System.IO.Directory.Exists(buildtimeBgfxToolsPath))
-					{
-						canBuild = false;
-					}
-				}
-				if (canBuild)
-				{
-					String.NewOrSet!(buildtimeShaderIncludePath, path);
-					buildtimeShaderIncludePath.Append("/../bgfx-beef/submodules/bgfx/src/");
-					if (!System.IO.Directory.Exists(buildtimeShaderIncludePath))
-					{
-						canBuild = false;
-					}
-				}
+				buildtimeBgfxToolsPath.Set(dependencyRoot);
+				buildtimeBgfxToolsPath.Append(ToolsPath2);
 			}
+			String.NewOrSet!(buildtimeNgaShaderIncludePath, dependencyRoot);
+			buildtimeNgaShaderIncludePath.Append("/NoGraphicsAPI-beef/submodules/NoGraphicsAPI/utility/include/");
 			if (canBuild)
 			{
 				Log.Info("NOTE: Running in build mode!");
@@ -312,20 +304,20 @@ namespace GameCore
 					}
 				}
 				BuildResourcesForPlatform(.Last, "");
-				buildResourceLock = new Monitor();
 		#if BF_PLATFORM_WINDOWS
 				// Watch buildtime folder
 				buildResourcesWatched = new FileSystemWatcher(buildtimeResourcesPath);
 				buildResourcesWatched.IncludeSubdirectories = true;
-				buildResourcesWatched.StartRaisingEvents();
 				buildResourcesWatched.OnCreated.Add(new (fileName) => OnFileChange(fileName));
 				buildResourcesWatched.OnChanged.Add(new (fileName) => OnFileChange(fileName));
+				buildResourcesWatched.OnDeleted.Add(new (fileName) => OnFileChange(fileName));
+				buildResourcesWatched.StartRaisingEvents();
 		#endif
 			}
 #endif
 		}
 
-		public static void Initialize(String path, String resourcesFileName, int resourcesFilePosition, int resourcesFileSize, bool isEditor)
+		public static void Initialize(String path, String resourcesFileName, int resourcesFilePosition, int resourcesFileSize, bool isEditor, StringView dependencyRoot = default)
 		{
 			if (!isEditor)
 			{
@@ -370,12 +362,20 @@ namespace GameCore
 #else
 			buildtimeToolsPath.Append("macos/");
 #endif
-			String.NewOrSet!(buildtimeBgfxToolsPath, path);
-			InitializeRuntimeBuild(path);
+			var resolvedDependencyRoot = scope String();
+			Path.GetFullPath(dependencyRoot.IsEmpty ? scope $"{path}/.." : dependencyRoot, resolvedDependencyRoot);
+			String.NewOrSet!(buildtimeBgfxToolsPath, resolvedDependencyRoot);
+			InitializeRuntimeBuild(resolvedDependencyRoot);
 			if (!System.IO.Directory.Exists(runtimeResourcesPath))
 			{
 				SystemUtils.ShowMessageBoxOK("ERROR", "Runtime folder missing!");
 				System.Environment.Exit(1);
+			}
+
+			if (!canBuild)
+			{
+				var resourceList = scope ResourceList();
+				resourceList.Load("resources.json");
 			}
 
 			loadResourcesJob = JobSystem.CreateJob(new [&] (startIndex, endIndex, workerIndex) => LoadResourcesJobFunction(startIndex, endIndex, workerIndex));

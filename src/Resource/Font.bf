@@ -105,7 +105,7 @@ namespace GameCore
 			var pivot = Vector2(0.0f, -1.0f);
 			var worldMatrix = _worldMatrix;
 			var offsetY = (float)(fontData.lineHeight - fontData.baseHeight);
-			batchRenderer.Begin(shader, viewId, settings, 0, 0, shaderProgramIndex, false, .Null, _modelViewMatrix);
+			batchRenderer.Begin(shader, viewId, settings, null, null, shaderProgramIndex, false, null, _modelViewMatrix);
 			if (fontFlags != 0)
 			{
 				var extents = GetTextExtents(text);

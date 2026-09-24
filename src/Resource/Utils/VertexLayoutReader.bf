@@ -1,8 +1,8 @@
+using NoGraphicsAPI;
 using System;
 using System.Collections;
 using System.IO;
 using System.Diagnostics;
-using Bgfx;
 
 namespace GameCore
 {
@@ -10,10 +10,10 @@ namespace GameCore
 	{
 		struct AttribToId
 		{
-			public bgfx.Attrib attr;
+			public VertexAttribute attr;
 			public uint16 id;
 
-			public this(bgfx.Attrib _attr, uint16 _id)
+			public this(VertexAttribute _attr, uint16 _id)
 			{
 				attr = _attr;
 				id = _id;
@@ -22,10 +22,10 @@ namespace GameCore
 
 		struct AttribTypeToId
 		{
-			public bgfx.AttribType type;
+			public VertexComponent type;
 			public uint16 id;
 
-			public this(bgfx.AttribType _type, uint16 _id)
+			public this(VertexComponent _type, uint16 _id)
 			{
 				type = _type;
 				id = _id;
@@ -34,36 +34,36 @@ namespace GameCore
 
 		static readonly var s_attribToId = new AttribToId[]
 			(
-			.(bgfx.Attrib.Position, 0x0001),
-			.(bgfx.Attrib.Normal, 0x0002),
-			.(bgfx.Attrib.Tangent, 0x0003),
-			.(bgfx.Attrib.Bitangent, 0x0004),
-			.(bgfx.Attrib.Color0, 0x0005),
-			.(bgfx.Attrib.Color1, 0x0006),
-			.(bgfx.Attrib.Color2, 0x0018),
-			.(bgfx.Attrib.Color3, 0x0019),
-			.(bgfx.Attrib.Indices, 0x000e),
-			.(bgfx.Attrib.Weight, 0x000f),
-			.(bgfx.Attrib.TexCoord0, 0x0010),
-			.(bgfx.Attrib.TexCoord1, 0x0011),
-			.(bgfx.Attrib.TexCoord2, 0x0012),
-			.(bgfx.Attrib.TexCoord3, 0x0013),
-			.(bgfx.Attrib.TexCoord4, 0x0014),
-			.(bgfx.Attrib.TexCoord5, 0x0015),
-			.(bgfx.Attrib.TexCoord6, 0x0016),
-			.(bgfx.Attrib.TexCoord7, 0x0017)
+			.(VertexAttribute.Position, 0x0001),
+			.(VertexAttribute.Normal, 0x0002),
+			.(VertexAttribute.Tangent, 0x0003),
+			.(VertexAttribute.Bitangent, 0x0004),
+			.(VertexAttribute.Color0, 0x0005),
+			.(VertexAttribute.Color1, 0x0006),
+			.(VertexAttribute.Color2, 0x0018),
+			.(VertexAttribute.Color3, 0x0019),
+			.(VertexAttribute.Indices, 0x000e),
+			.(VertexAttribute.Weight, 0x000f),
+			.(VertexAttribute.TexCoord0, 0x0010),
+			.(VertexAttribute.TexCoord1, 0x0011),
+			.(VertexAttribute.TexCoord2, 0x0012),
+			.(VertexAttribute.TexCoord3, 0x0013),
+			.(VertexAttribute.TexCoord4, 0x0014),
+			.(VertexAttribute.TexCoord5, 0x0015),
+			.(VertexAttribute.TexCoord6, 0x0016),
+			.(VertexAttribute.TexCoord7, 0x0017)
 			) ~ delete _;
 
 		static readonly var s_attribTypeToId = new AttribTypeToId[]
 			(
-			.(bgfx.AttribType.Uint8, 0x0001),
-			.(bgfx.AttribType.Uint10, 0x0005),
-			.(bgfx.AttribType.Int16, 0x0002),
-			.(bgfx.AttribType.Half, 0x0003),
-			.(bgfx.AttribType.Float, 0x0004)
+			.(VertexComponent.Uint8, 0x0001),
+			.(VertexComponent.Uint10, 0x0005),
+			.(VertexComponent.Int16, 0x0002),
+			.(VertexComponent.Half, 0x0003),
+			.(VertexComponent.Float, 0x0004)
 			) ~ delete _;
 
-		static bgfx.Attrib idToAttrib(uint16 id)
+		static VertexAttribute idToAttrib(uint16 id)
 		{
 			for (var attr in s_attribToId)
 			{
@@ -75,7 +75,7 @@ namespace GameCore
 			return .Count;
 		}
 
-		static bgfx.AttribType idToAttribType(uint16 id)
+		static VertexComponent idToAttribType(uint16 id)
 		{
 			for (var attr in s_attribTypeToId)
 			{
@@ -87,11 +87,11 @@ namespace GameCore
 			return .Count;
 		}
 
-		public static bool Read(Stream stream, ref bgfx.VertexLayout vertex_layout)
+		public static bool Read(Stream stream, ref VertexLayout vertex_layout)
 		{
 			var numAttrs = stream.Read<uint8>().Value;
 			var stride = stream.Read<uint16>().Value;
-			bgfx.vertex_layout_begin(&vertex_layout, bgfx.get_renderer_type());
+			vertex_layout.Begin();
 			for (var ii = 0; ii < numAttrs; ++ii)
 			{
 				var offset = stream.Read<uint16>().Value;
@@ -105,11 +105,11 @@ namespace GameCore
 				var type = idToAttribType(attribTypeId);
 				if (attr != .Count && type != .Count)
 				{
-					bgfx.vertex_layout_add(&vertex_layout, attr, num, type, normalized, asInt);
+					vertex_layout.Add(attr, num, type, normalized, asInt);
 					vertex_layout.offset[(int)attr] = offset;
 				}
 			}
-			bgfx.vertex_layout_end(&vertex_layout);
+			vertex_layout.End();
 			vertex_layout.stride = stride;
 			return true;
 		}

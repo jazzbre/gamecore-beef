@@ -1,6 +1,6 @@
+using NoGraphicsAPI;
 using System;
 using System.Collections;
-using Bgfx;
 
 namespace GameCore
 {
@@ -31,8 +31,8 @@ namespace GameCore
 		private List<SpriteRenderer> renderers = new List<SpriteRenderer>() ~ delete _;
 		private Vector4[] instanceData = null ~ delete _;
 
-		private bgfx.StateFlags stateFlags;
-		private bgfx.SamplerFlags samplerFlags;
+		private RenderState? stateFlags;
+		private SamplerDesc? samplerFlags;
 		private int programIndex;
 
 		private Vector4 textureScale;
@@ -42,12 +42,12 @@ namespace GameCore
 		public int MaxCount { get; private set; }
 
 		public Shader Shader { get; private set; }
-		public Texture Texture { get; private set; }
+		public GameCore.Texture Texture { get; private set; }
 		public uint16 ViewId { get; private set; }
 		public int BatchCount { get; private set; }
 		public Vector4 Settings { get; private set; }
 		public bool Tesselated { get; private set; }
-		public bgfx.TextureHandle VertexTextureHandle { get; set; } = .Null;
+		public GpuTexture VertexTextureHandle { get; set; } = null;
 
 		public this(int maxCount = 64)
 		{
@@ -59,7 +59,7 @@ namespace GameCore
 		{
 		}
 
-		public void Begin(Shader shader, uint16 viewId, Vector4 settings, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int _programIndex = 0, bool tesselated = false, bgfx.TextureHandle vertexTexture = .Null, Matrix4 _modelViewMatrix = .Identity)
+		public void Begin(Shader shader, uint16 viewId, Vector4 settings, RenderState? _stateFlags = null, SamplerDesc? _samplerFlags = null, int _programIndex = 0, bool tesselated = false, GpuTexture vertexTexture = null, Matrix4 _modelViewMatrix = .Identity)
 		{
 			if (renderers.Count > 0)
 			{
@@ -70,30 +70,17 @@ namespace GameCore
 			Settings = settings;
 			Texture = null;
 			Tesselated = tesselated;
-			samplerFlags = _samplerFlags;
-			programIndex = _programIndex;
-			VertexTextureHandle = .Null;
-			if (_stateFlags != 0)
-			{
-				stateFlags = _stateFlags;
-			} else
-			{
-				stateFlags = bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.DepthTestAlways | bgfx.blend_function(bgfx.StateFlags.BlendSrcAlpha, bgfx.StateFlags.BlendInvSrcAlpha);
-			}
-			if (_samplerFlags != 0)
-			{
-				samplerFlags = _samplerFlags;
-			} else
-			{
-				samplerFlags = bgfx.SamplerFlags.MinPoint | bgfx.SamplerFlags.MagPoint | bgfx.SamplerFlags.MipPoint | bgfx.SamplerFlags.UClamp | bgfx.SamplerFlags.VClamp;
-			}
+            samplerFlags = _samplerFlags.GetValueOrDefault(RenderManager.PointClamp);
+            stateFlags = _stateFlags.GetValueOrDefault(.Alpha);
+            programIndex = _programIndex;
+            VertexTextureHandle = vertexTexture;
 			BatchCount = 0;
 			modelViewMatrix = _modelViewMatrix;
 		}
 
-		public void Begin(Shader shader, uint16 viewId, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int _programIndex = 0, Matrix4 _modelViewMatrix = .Identity)
+		public void Begin(Shader shader, uint16 viewId, RenderState? _stateFlags = null, SamplerDesc? _samplerFlags = null, int _programIndex = 0, Matrix4 _modelViewMatrix = .Identity)
 		{
-			Begin(shader, viewId, Settings, _stateFlags, _samplerFlags, _programIndex, false, .Null, _modelViewMatrix);
+			Begin(shader, viewId, Settings, _stateFlags, _samplerFlags, _programIndex, false, null, _modelViewMatrix);
 		}
 
 		public void Add(Sprite sprite, Matrix4 worldMatrix, Color color = .White, Vector2 pivot = Vector2.Zero, SpriteFlags flags = 0)
@@ -135,14 +122,14 @@ namespace GameCore
 			return pivotWorldMatrix;
 		}
 
-		public void Add(Texture texture, int _spriteIndex, Vector3 spriteSize, Matrix4 worldMatrix, Color color = Color.White, Vector2 pivot = Vector2.Zero, SpriteFlags flags = 0)
+		public void Add(GameCore.Texture texture, int _spriteIndex, Vector3 spriteSize, Matrix4 worldMatrix, Color color = Color.White, Vector2 pivot = Vector2.Zero, SpriteFlags flags = 0)
 		{
 			var pivotWorldMatrix = GetPivotMatrix(spriteSize, worldMatrix, pivot, flags);
 			Add(texture, _spriteIndex, spriteSize, pivotWorldMatrix, color);
 		}
 
 
-		public void Add(Texture texture, int _spriteIndex, Vector3 spriteSize, Matrix4 pivotWorldMatrix, Color color = Color.White)
+		public void Add(GameCore.Texture texture, int _spriteIndex, Vector3 spriteSize, Matrix4 pivotWorldMatrix, Color color = Color.White)
 		{
 			if (texture != Texture)
 			{
@@ -179,7 +166,7 @@ namespace GameCore
 				instanceData[dataIndex + 3] = Texture.SpriteData[renderer.spriteIndex];
 			}
 			// Render
-			RenderManager.RenderMeshes(ViewId, modelViewMatrix, Shader, renderers.Count, &instanceData[0], dataIndex, Settings, textureScale, scope bgfx.TextureHandle[](Texture.Handle, VertexTextureHandle), stateFlags, samplerFlags, programIndex, Tesselated);
+			RenderManager.RenderMeshes(ViewId, modelViewMatrix, Shader, renderers.Count, &instanceData[0], dataIndex, Settings, textureScale, scope GpuTexture[](Texture.Handle, VertexTextureHandle), stateFlags, samplerFlags, programIndex, Tesselated);
 			renderers.Clear();
 			++BatchCount;
 		}

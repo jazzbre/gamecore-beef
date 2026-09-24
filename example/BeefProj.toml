@@ -1,0 +1,12 @@
+FileVersion = 1
+Dependencies = {corlib = "*", gamecore-beef = "*", imgui-nga-beef = "*", sdl2-beef = "*", NoGraphicsAPI-beef = "*", jazzutils-beef = "*"}
+[Project]
+Name = "example"
+StartupObject = "Example.Program"
+DefaultNamespace = "Example"
+
+[Configs.Debug.Win64]
+DebugWorkingDirectory = "$(ProjectDir)"
+
+[Configs.Release.Win64]
+DebugWorkingDirectory = "$(ProjectDir)"

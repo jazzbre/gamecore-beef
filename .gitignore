@@ -6,5 +6,6 @@ imgui.ini
 levelEditorSettings.json
 _*.txt
 runtime/resources/*
+example/runtime/resources/*
 !.gitkeep
 export/

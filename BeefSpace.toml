@@ -1,5 +1,5 @@
 FileVersion = 1
-Projects = {gamecore = {Path = "."}, bgfx-beef = {Path = "../bgfx-beef"}, imguibgfx-beef = {Path = "../imguibgfx-beef"}, jazzutils-beef = {Path = "../jazzutils-beef"}, JSON_Beef = {Path = "../JSON_Beef/lib"}, minicoro-beef = {Path = "../minicoro-beef"}, nativefiledialog-beef = {Path = "../nativefiledialog-beef"}, ozz-animation-beef = {Path = "../ozz-animation-beef"}, sdl2-beef = {Path = "../sdl2-beef"}, soloud-beef = {Path = "../soloud-beef"}}
+Projects = {example = {Path = "example"}, gamecore-beef = {Path = "."}, NoGraphicsAPI-beef = {Path = "../NoGraphicsAPI-beef"}, imgui-nga-beef = {Path = "../imgui-nga-beef"}, jazzutils-beef = {Path = "../jazzutils-beef"}, JSON_Beef = {Path = "../JSON_Beef/lib"}, minicoro-beef = {Path = "../minicoro-beef"}, nativefiledialog-beef = {Path = "../nativefiledialog-beef"}, ozz-animation-beef = {Path = "../ozz-animation-beef"}, sdl2-beef = {Path = "../sdl2-beef"}, soloud-beef = {Path = "../soloud-beef"}}
 
 [Workspace]
-StartupProject = "gamecore-beef"
+StartupProject = "example"

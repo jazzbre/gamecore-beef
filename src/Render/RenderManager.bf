@@ -1,363 +1,261 @@
 using System;
 using System.Collections;
-using Bgfx;
+using System.Threading;
+using NoGraphicsAPI;
+using ImGui;
 
-namespace GameCore
+namespace GameCore;
+
+public enum RenderShaderType { Font, Last }
+
+public static class RenderManager
 {
-	enum RenderShaderType
-	{
-		Font,
-		Last
-	}
-
-	static class RenderManager
-	{
-		public struct Statistics
-		{
-			public uint64 submitCount = 0;
-			public uint64 blitCount = 0;
-
-			public void Clear() mut
-			{
-				submitCount = 0;
-				blitCount = 0;
-			}
-		}
-
-		public static var statistics = Statistics();
-
-		public static SpriteBatchRenderer batchRenderer;
-		public static SpriteBatchRenderer entityBatchRenderer;
-
-		public static bgfx.TextureHandle readBackTextureHandle = .Null;
-
-		public static RenderTexture temporaryRenderTextureWithDepth;
-
-		public static int width = 1280;
-		public static int height = 720;
-		public static float ooWidth, ooHeight;
-		public static var viewBounds = Bounds2();
-		public static float aspectRatio = 1.0f;
-
-		public static bgfx.VertexBufferHandle batchVertexBufferHandle;
-		public static bgfx.IndexBufferHandle batchIndexBufferHandle;
-		public static int batchVertexCount;
-		public static int batchIndexCount;
-		public static bgfx.VertexBufferHandle batchTesselatedVertexBufferHandle;
-		public static bgfx.IndexBufferHandle batchTesselatedIndexBufferHandle;
-		public static int batchTesselatedVertexCount;
-		public static int batchTesselatedIndexCount;
-		public static bgfx.VertexLayout batchVertexLayout;
-
-		public static var textureUniformHandles = new bgfx.UniformHandle[8] ~ delete _;
-		public static bgfx.UniformHandle colorUniformHandle;
-		public static bgfx.UniformHandle timeUniformHandle;
-		public static bgfx.UniformHandle settingsUniformHandle;
-		public static bgfx.UniformHandle textureScaleUniformHandle;
-		public static bgfx.UniformHandle instanceDataUniformHandle;
-		public static bgfx.UniformHandle instanceDataPSUniformHandle;
-		public static bgfx.UniformHandle shUniformHandle;
-
-		public static var shaders = new Shader[(int)RenderShaderType.Last] ~ DeleteAndNullify!(_);
-
-		public static uint16 PreViewId { get; private set; }
-		public static uint16 ViewId { get; private set; }
-		public static uint16 PostViewId { get; private set; }
-
-		public static Vector4 ShaderData { get; private set; }
-
-		public static bool capture = true;
-
-		public static bool IsRenderTextureYFlipped { get; private set; }
-
-		public static bgfx.RendererType RendererType { get; private set; }
-		public static bgfx.RendererType ShaderRendererType { get; private set; }
-
-		public static SH9 sh9 = new .() ~ delete _;
-
-		public static Shader GetShader(RenderShaderType type)
-		{
-			return shaders[(int)type];
-		}
-
-		public static void PreInitialize()
-		{
-			RendererType = bgfx.get_renderer_type();
-			ShaderRendererType = RendererType == .Direct3D12 ? .Direct3D11 : RendererType;
-			IsRenderTextureYFlipped = RendererType != .OpenGL && RendererType != .OpenGLES;
-		}
-
-		public static void Resize(int newWidth, int newHeight)
-		{
-			if (width == newWidth && height == newHeight)
-			{
-				return;
-			}
-			width = newWidth;
-			height = newHeight;
-			ooWidth = 1.0f / width;
-			ooHeight = 1.0f / height;
-			aspectRatio = width * ooHeight;
-			viewBounds = .(.Zero, .(width, height));
-
-			if (temporaryRenderTextureWithDepth == null)
-			{
-				temporaryRenderTextureWithDepth = new .(width, height, .RGBA16F, .D24S8);
-			} else
-			{
-				temporaryRenderTextureWithDepth.Resize(newWidth, newHeight);
-			}
-		}
-
-		public static bool Initialize(int maxBatchCount = 128)
-		{
-			Log.Info(scope $"Render target {width}x{height}");
-			SDL2.SDL.Log(scope $"Renderer:{RendererType}, {width}x{height}, IsRenderTextureYFlipped {IsRenderTextureYFlipped}");
-			batchRenderer = new .();
-			entityBatchRenderer = new .();
-			// Generate batch buffers
-			// Setup buffers
-			bgfx.vertex_layout_begin(&batchVertexLayout, bgfx.get_renderer_type());
-			bgfx.vertex_layout_add(&batchVertexLayout, bgfx.Attrib.Position, 3, bgfx.AttribType.Float, false, false);
-			bgfx.vertex_layout_end(&batchVertexLayout);
-			// Default quad
-			CreateQuad(1, 1, maxBatchCount, out batchVertexBufferHandle, out batchIndexBufferHandle, out batchVertexCount, out batchIndexCount);
-			// Tesselated
-			CreateQuad(2, 2, maxBatchCount, out batchTesselatedVertexBufferHandle, out batchTesselatedIndexBufferHandle, out batchTesselatedVertexCount, out batchTesselatedIndexCount);
-			// Load shaders
-			shaders[(int)RenderShaderType.Font] = ResourceManager.GetResource<Shader>("shaders/font_sprite_texture");
-			textureUniformHandles[0] = bgfx.create_uniform("s_texture", bgfx.UniformType.Sampler, 1);
-			for (int i = 1; i < textureUniformHandles.Count; ++i)
-			{
-				textureUniformHandles[i] = bgfx.create_uniform(scope $"s_texture{i + 1}", bgfx.UniformType.Sampler, 1);
-			}
-			colorUniformHandle = bgfx.create_uniform("s_color", bgfx.UniformType.Vec4, 1);
-			timeUniformHandle = bgfx.create_uniform("s_time", bgfx.UniformType.Vec4, 1);
-			settingsUniformHandle = bgfx.create_uniform("s_settings", bgfx.UniformType.Vec4, 1);
-			textureScaleUniformHandle = bgfx.create_uniform("s_textureScale", bgfx.UniformType.Vec4, 1);
-			instanceDataUniformHandle = bgfx.create_uniform("s_instanceData", bgfx.UniformType.Vec4, (uint16)256);
-			instanceDataPSUniformHandle = bgfx.create_uniform("s_instanceDataPS", bgfx.UniformType.Vec4, (uint16)8);
-			shUniformHandle = bgfx.create_uniform("s_sh", bgfx.UniformType.Vec4, (uint16)9);
-			if (capture)
-			{
-				readBackTextureHandle = bgfx.create_texture_2d((.)width, (.)height, false, 1, .RGBA8, (.)(bgfx.TextureFlags.ReadBack | bgfx.TextureFlags.BlitDst), null);
-			}
-
-			return true;
-		}
-
-		public static void Finalize()
-		{
-			for (var textureUniformHandle in textureUniformHandles)
-			{
-				bgfx.destroy_uniform(textureUniformHandle);
-			}
-			bgfx.destroy_uniform(colorUniformHandle);
-			bgfx.destroy_uniform(timeUniformHandle);
-			bgfx.destroy_uniform(settingsUniformHandle);
-			bgfx.destroy_uniform(textureScaleUniformHandle);
-			bgfx.destroy_uniform(instanceDataUniformHandle);
-			bgfx.destroy_uniform(instanceDataPSUniformHandle);
-			bgfx.destroy_uniform(shUniformHandle);
-			delete batchRenderer;
-			delete entityBatchRenderer;
-			bgfx.destroy_vertex_buffer(batchVertexBufferHandle);
-			bgfx.destroy_index_buffer(batchIndexBufferHandle);
-			delete temporaryRenderTextureWithDepth;
-
-			if (readBackTextureHandle.Valid)
-			{
-				bgfx.destroy_texture(readBackTextureHandle);
-			}
-		}
-
-		public static void OnPreRender(float timeStep)
-		{
-			PreViewId = 0;
-			ViewId = 60;
-			PostViewId = 100;
-			ShaderData = .((float)Time.Time, (float)(Time.Time * 0.1), timeStep, 1.0f / timeStep);
-			statistics.Clear();
-		}
-
-		public static void OnPostRender()
-		{
-		}
-
-		public static uint16 NextPreViewId()
-		{
-			return ++PreViewId;
-		}
-
-		public static uint16 NextViewId()
-		{
-			return ++ViewId;
-		}
-
-		public static uint16 NextPostViewId()
-		{
-			return ++PostViewId;
-		}
-
-		public static void BlitWithShader(uint16 viewId, Shader shader, RenderTexture targetRenderTexture, bgfx.TextureHandle sourceTextureHandle, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, bool clear = true, int shiftScale = 0, int programIndex = 0)
-		{
-			let width = targetRenderTexture.Width >> shiftScale;
-			let height = targetRenderTexture.Height >> shiftScale;
-			bgfx.set_view_clear(viewId, clear ? (uint16)(bgfx.ClearFlags.Color | bgfx.ClearFlags.Depth) : 0, 0, 1.0f, 0);
-			bgfx.set_view_frame_buffer(viewId, targetRenderTexture.FrameBufferHandle);
-			bgfx.set_view_rect(viewId, 0, 0, (uint16)width, (uint16)height);
-			bgfx.set_view_mode(viewId, .Sequential);
-			var view = Matrix4.Identity;
-			var projection = RenderManager.CreatePerspectiveOrtho(0, (float)width, 0, (float)height, 0.0f, 1.0f, 0.0f);
-			bgfx.set_view_transform(viewId, view.Ptr(), projection.Ptr());
-			bgfx.set_view_name(viewId, "Blit", 4);
-			bgfx.touch(viewId);
-			RenderManager.RenderScreenQuad(viewId, shader, sourceTextureHandle, _stateFlags, _samplerFlags, programIndex);
-		}
-
-
-		public static void BlitWithShader(uint16 viewId, Shader shader, RenderTexture targetRenderTexture, bgfx.TextureHandle[] textureHandles, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, bool clear = true, int shiftScale = 0, int programIndex = 0)
-		{
-			let width = targetRenderTexture.Width >> shiftScale;
-			let height = targetRenderTexture.Height >> shiftScale;
-			bgfx.set_view_clear(viewId, clear ? (uint16)(bgfx.ClearFlags.Color | bgfx.ClearFlags.Depth) : 0, 0, 1.0f, 0);
-			bgfx.set_view_frame_buffer(viewId, targetRenderTexture.FrameBufferHandle);
-			bgfx.set_view_rect(viewId, 0, 0, (uint16)width, (uint16)height);
-			bgfx.set_view_mode(viewId, .Sequential);
-			var view = Matrix4.Identity;
-			var projection = RenderManager.CreatePerspectiveOrtho(0, (float)width, 0, (float)height, 0.0f, 1.0f, 0.0f);
-			bgfx.set_view_transform(viewId, view.Ptr(), projection.Ptr());
-			bgfx.set_view_name(viewId, "Blit2", 5);
-			bgfx.touch(viewId);
-			RenderManager.RenderScreenQuad(viewId, shader, textureHandles, _stateFlags, _samplerFlags, programIndex);
-		}
-
-
-		public static void RenderScreenQuad(uint16 viewId, Shader shader, bgfx.TextureHandle textureHandle, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int programIndex = 0)
-		{
-			var stateFlags = _stateFlags != 0 ? _stateFlags : bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.DepthTestAlways | bgfx.blend_function(bgfx.StateFlags.BlendSrcAlpha, bgfx.StateFlags.BlendInvSrcAlpha);
-			var samplerFlags = _samplerFlags != 0 ? (uint32)_samplerFlags : (uint32)(bgfx.SamplerFlags.UClamp | bgfx.SamplerFlags.VClamp);
-			var identity = Matrix4.Identity;
-			bgfx.set_transform(identity.Ptr(), 1);
-			bgfx.set_state((uint64)stateFlags, 0);
-			bgfx.set_vertex_buffer(0, batchVertexBufferHandle, 0, 4);
-			bgfx.set_index_buffer(batchIndexBufferHandle, 0, 6);
-			if (textureHandle.idx != uint16.MaxValue)
-			{
-				bgfx.set_texture(0, textureUniformHandles[0], textureHandle, samplerFlags);
-			}
-			bgfx.submit(viewId, shader.Programs[programIndex], 0, (uint8)bgfx.DiscardFlags.All);
-			++RenderManager.statistics.submitCount;
-		}
-
-		public static void RenderScreenQuad(uint16 viewId, Shader shader, bgfx.TextureHandle[] textureHandles, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int programIndex = 0)
-		{
-			var stateFlags = _stateFlags != 0 ? _stateFlags : bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.DepthTestAlways | bgfx.blend_function(bgfx.StateFlags.BlendSrcAlpha, bgfx.StateFlags.BlendInvSrcAlpha);
-			var identity = Matrix4.Identity;
-			bgfx.set_transform(identity.Ptr(), 1);
-			bgfx.set_state((uint64)stateFlags, 0);
-			bgfx.set_vertex_buffer(0, batchVertexBufferHandle, 0, 4);
-			bgfx.set_index_buffer(batchIndexBufferHandle, 0, 6);
-			if (textureHandles != null)
-			{
-				for (int i = 0; i < textureHandles.Count; ++i)
-				{
-					bgfx.set_texture((uint8)i, textureUniformHandles[i], textureHandles[i], _samplerFlags != 0 ? (uint32)_samplerFlags : (uint32)(bgfx.SamplerFlags.UClamp | bgfx.SamplerFlags.VClamp));
-				}
-			}
-			bgfx.set_uniform(timeUniformHandle, &ShaderData.x, 1);
-			bgfx.submit(viewId, shader.Programs[programIndex], 0, (uint8)bgfx.DiscardFlags.All);
-			++RenderManager.statistics.submitCount;
-		}
-
-		public static void RenderMeshes(uint16 viewId, Matrix4 _worldMatrix, Shader shader, int quadCount, Vector4* instanceData, int instanceDataCount, Vector4 settings, Vector4 textureScale, bgfx.TextureHandle[] textureHandles, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int programIndex = 0, bool tesselated = false)
-		{
-			var stateFlags = _stateFlags != 0 ? _stateFlags : bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA | bgfx.StateFlags.DepthTestAlways | bgfx.blend_function(bgfx.StateFlags.BlendSrcAlpha, bgfx.StateFlags.BlendInvSrcAlpha);
-			var samplerFlags = _samplerFlags != 0 ? (uint32)_samplerFlags : (uint32)(bgfx.SamplerFlags.UClamp | bgfx.SamplerFlags.VClamp | bgfx.SamplerFlags.Point);
-				// Render
-			var worldMatrix = _worldMatrix;
-
-			bgfx.VertexBufferHandle vertexBuffer;
-			bgfx.IndexBufferHandle indexBuffer;
-			int vertexCount;
-			int indexCount;
-
-			if (tesselated)
-			{
-				vertexBuffer = batchTesselatedVertexBufferHandle;
-				indexBuffer = batchTesselatedIndexBufferHandle;
-				vertexCount = batchTesselatedVertexCount;
-				indexCount = batchTesselatedIndexCount;
-			}
-			else
-			{
-				vertexBuffer = batchVertexBufferHandle;
-				indexBuffer = batchIndexBufferHandle;
-				vertexCount = batchVertexCount;
-				indexCount = batchIndexCount;
-			}
-
-			bgfx.set_transform(worldMatrix.Ptr(), 1);
-			bgfx.set_state((uint64)stateFlags, 0);
-			bgfx.set_uniform(instanceDataUniformHandle, instanceData, (uint16)instanceDataCount);
-			bgfx.set_uniform(timeUniformHandle, &ShaderData.x, 1);
-			bgfx.set_uniform(settingsUniformHandle, &settings.x, 1);
-			bgfx.set_uniform(textureScaleUniformHandle, &textureScale.x, 1);
-			bgfx.set_vertex_buffer(0, vertexBuffer, 0, (uint32)(quadCount * vertexCount));
-			bgfx.set_index_buffer(indexBuffer, 0, (uint32)(quadCount * indexCount));
-			if (textureHandles != null)
-			{
-				for (int i = 0; i < textureHandles.Count; ++i)
-				{
-					if (!textureHandles[i].Valid)
-					{
-						continue;
-					}
-					bgfx.set_texture((uint8)i, textureUniformHandles[i], textureHandles[i], samplerFlags);
-				}
-			}
-			bgfx.submit(viewId, shader.Programs[programIndex], 0, (uint8)bgfx.DiscardFlags.All);
-			++RenderManager.statistics.submitCount;
-		}
-
-		public static void FixProjectionMatrix(ref Matrix4 projection)
-		{
-			if (!IsRenderTextureYFlipped)
-			{
-				return;
-			}
-			projection.d[5] = -projection.d[5];
-			projection.v.m31 = -projection.v.m31;
-		}
-
-		public static bgfx.StateFlags GetCullingState(bool ccw)
-		{
-			if (!IsRenderTextureYFlipped)
-			{
-				return ccw ? .CullCcw : .CullCw;
-			}
-			return ccw ? .CullCw : .CullCcw;
-		}
-
-		public static Matrix4 CreatePerspectiveOrtho(float _left, float _right, float _bottom, float _top, float _near, float _far, float _offset = 0.0f)
-		{
-			var projection = Matrix4.CreatePerspectiveOrtho(_left, _right, _bottom, _top, _near, _far, _offset, false);
-			FixProjectionMatrix(ref projection);
-			return projection;
-		}
-
-		public static void SetViewRectangle(uint16 _id, uint16 _x, uint16 _y, uint16 _width, uint16 _height)
-		{
-			if (IsRenderTextureYFlipped)
-			{
-				bgfx.set_view_rect(_id, _x, (.)(height - _height - _y), _width, _height);
-			} else
-			{
-				bgfx.set_view_rect(_id, _x, _y, _width, _height);
-			}
-		}
-
-		public static void CreateQuad(int tessX, int tessY, int batchCount, out bgfx.VertexBufferHandle outVertexBuffer, out bgfx.IndexBufferHandle outIndexBuffer, out int vertsPerBatch, out int indicesPerBatch)
+    public struct Statistics
+    {
+        public uint64 submitCount, blitCount;
+        public void Clear() mut { this = default; }
+    }
+    struct RetiredTexture
+    {
+        public NoGraphicsAPI.Texture* Texture;
+        public TextureHeap Memory;
+        public RenderView* View;
+        public uint32 Descriptor;
+        public ImGui.TextureID Image;
+    }
+    public static readonly Monitor ResourceLock = new .() ~ delete _;
+    public static Device* Device;
+    public static CommandPool* UploadPool;
+    public static RenderContext Context;
+    public static GpuHeap TextureDescriptors, SamplerDescriptors;
+    private static TimelinePoint completion;
+    private static List<GpuHeap> retiredBuffers = new .() ~ delete _;
+    private static List<RetiredTexture> retiredTextures = new .() ~ delete _;
+    private static List<uint32> freeDescriptors = new .() ~ delete _;
+    private static uint32 nextDescriptor;
+    private static List<SamplerDesc> samplerDescriptions = new .() ~ delete _;
+    private static GpuTexture whiteTexture;
+    public static Statistics statistics;
+    public static SpriteBatchRenderer batchRenderer, entityBatchRenderer;
+    public static RenderTexture temporaryRenderTextureWithDepth;
+    public static GpuTexture readBackTextureHandle;
+    public static bool capture;
+    public static int width = 1280, height = 720;
+    public static float ooWidth, ooHeight, aspectRatio = 1;
+    public static Bounds2 viewBounds;
+    public static bool IsRenderTextureYFlipped => true;
+    public static Vector4 ShaderData { get; private set; }
+    public static uint16 PreViewId { get; private set; }
+    public static uint16 ViewId { get; private set; }
+    public static uint16 PostViewId { get; private set; }
+    public static GpuBuffer batchVertexBufferHandle, batchIndexBufferHandle, batchTesselatedVertexBufferHandle, batchTesselatedIndexBufferHandle;
+    public static int batchVertexCount, batchIndexCount, batchTesselatedVertexCount, batchTesselatedIndexCount;
+    public static VertexLayout batchVertexLayout;
+    public static Shader[] shaders = new Shader[(int)RenderShaderType.Last] ~ delete _;
+    public static SH9 sh9 = new .() ~ delete _;
+    public typealias OverlayRenderer = function void(CommandBuffer* commands, uint32x2 extent, TimelinePoint completion);
+    public static SamplerDesc LinearClamp
+    {
+        get { SamplerDesc sampler = .(); sampler.address_u = sampler.address_v = sampler.address_w = .clamp_to_edge; return sampler; }
+    }
+    public static SamplerDesc PointClamp
+    {
+        get { var sampler = LinearClamp; sampler.min_filter = sampler.mag_filter = sampler.mip_filter = .nearest; return sampler; }
+    }
+    public static bool InitializeDevice(void* nativeWindow)
+    {
+        if (Device != null) return false;
+        DeviceDesc description = .(); description.window = nativeWindow; description.swapchain_format = .bgra8_srgb;
+        Device = GPU.CreateDevice(description).device;
+        if (Device == null) return false;
+        var capabilities = GPU.GetDeviceCaps(Device);
+        TextureDescriptors = GPU.CreateGpuHeap(Device, capabilities.texture_descriptor_size * 4352, .texture_descriptor_heap);
+        SamplerDescriptors = GPU.CreateGpuHeap(Device, capabilities.sampler_descriptor_size * 256, .sampler_descriptor_heap);
+        completion = .(); completion.semaphore = GPU.CreateTimelineSemaphore(Device, 0);
+        UploadPool = GPU.CreateCommandPool(Device, 0);
+        if (TextureDescriptors.owner == null || SamplerDescriptors.owner == null || completion.semaphore == null || UploadPool == null)
+        { ShutdownDevice(); return false; }
+        Context = new .(Device);
+        if (Context.Pool == null) { ShutdownDevice(); return false; }
+        uint32 white = uint32.MaxValue;
+        whiteTexture = new .(1, 1, .rgba8_unorm, .sampled, &white, 4);
+        GetSampler(LinearClamp);
+        return true;
+    }
+    public static bool InitializeImGui(SDL2.SDL.Window* window) => ImGui.NgaInitializeShared(window, Device, .bgra8_srgb, 256, &TextureDescriptors, &SamplerDescriptors, 4096, 255);
+    public static void ShutdownDevice()
+    {
+        ResourceLock.Enter(); defer ResourceLock.Exit();
+        if (Device == null) return;
+        GPU.WaitIdle(Device);
+        delete whiteTexture; whiteTexture = null;
+        CollectResources();
+        delete Context; Context = null;
+        GPU.DestroyCommandPool(UploadPool);
+        GPU.DestroyTimelineSemaphore(completion.semaphore);
+        GPU.DestroyGpuHeap(TextureDescriptors); GPU.DestroyGpuHeap(SamplerDescriptors);
+        GPU.DestroyDevice(Device); Device = null;
+        nextDescriptor = 0; freeDescriptors.Clear(); samplerDescriptions.Clear();
+    }
+    public static uint32 AllocateTextureDescriptor()
+    {
+        if (freeDescriptors.Count > 0) return freeDescriptors.PopBack();
+        if (nextDescriptor == 4096) Runtime.FatalError("GameCore texture descriptor capacity exceeded");
+        return nextDescriptor++;
+    }
+    public static uint32 GetSampler(SamplerDesc sampler)
+    {
+        for (int index = 0; index < samplerDescriptions.Count; ++index)
+        {
+            var existing = samplerDescriptions[index];
+            if (existing.min_filter == sampler.min_filter && existing.mag_filter == sampler.mag_filter && existing.mip_filter == sampler.mip_filter
+                && existing.address_u == sampler.address_u && existing.address_v == sampler.address_v && existing.address_w == sampler.address_w
+                && existing.anisotropic == sampler.anisotropic && existing.compare_enabled == sampler.compare_enabled && existing.compare == sampler.compare) return (.)index;
+        }
+        if (samplerDescriptions.Count >= 255) Runtime.FatalError("GameCore sampler capacity exceeded");
+        uint32 descriptor = (.)samplerDescriptions.Count;
+        samplerDescriptions.Add(sampler);
+        GPU.WriteSamplerDescriptor(Device, SamplerDescriptors.range.cpu + descriptor * GPU.GetDeviceCaps(Device).sampler_descriptor_size, sampler);
+        return descriptor;
+    }
+    public static void Retire(GpuHeap memory) { ResourceLock.Enter(); defer ResourceLock.Exit(); retiredBuffers.Add(memory); }
+    public static void RetireTexture(NoGraphicsAPI.Texture* texture, TextureHeap memory, RenderView* view, uint32 descriptor, ImGui.TextureID image)
+    { ResourceLock.Enter(); defer ResourceLock.Exit(); retiredTextures.Add(.() { Texture = texture, Memory = memory, View = view, Descriptor = descriptor, Image = image }); }
+    private static void CollectResources()
+    {
+        for (var memory in retiredBuffers) GPU.DestroyGpuHeap(memory);
+        retiredBuffers.Clear();
+        for (var texture in retiredTextures)
+        {
+            if (texture.Image != default) ImGui.NgaRemoveTexture(texture.Image);
+            GPU.DestroyRenderView(texture.View); GPU.DestroyTexture(texture.Texture); GPU.DestroyTextureHeap(texture.Memory);
+            freeDescriptors.Add(texture.Descriptor);
+        }
+        retiredTextures.Clear();
+    }
+    public static void SubmitUpload(CommandBuffer* commands)
+    {
+        var commands;
+        GPU.EndCommands(commands); completion.value++;
+        SubmitDesc submission = .(); submission.commands = .() { data = &commands, size = 1 }; submission.completion = completion;
+        GPU.Submit(Device, submission, 0); GPU.WaitTimeline(completion); GPU.ResetCommandPool(UploadPool);
+    }
+    public static bool Frame(OverlayRenderer overlay = null)
+    {
+        ResourceLock.Enter(); defer ResourceLock.Exit();
+        var commands = GPU.BeginCommands(Context.Pool);
+        var frame = GPU.Acquire(commands);
+        bool success = Context.Record(commands, frame);
+        completion.value++;
+        if (overlay != null && frame.render_view != null)
+        {
+            ColorAttachment color = .(); color.render_view = frame.render_view;
+            RenderingDesc rendering = .(); rendering.colors = .() { data = &color, size = 1 };
+            GPU.BeginRenderPass(commands, rendering, .none); overlay(commands, frame.extent, completion); GPU.EndRenderPass(commands);
+        }
+        GPU.EndCommands(commands);
+        SubmitDesc submission = .(); submission.commands = .() { data = &commands, size = 1 }; submission.completion = completion;
+        if (frame.render_view != null) GPU.SubmitAndPresent(Device, submission); else GPU.Submit(Device, submission, 0);
+        GPU.WaitTimeline(completion); CollectResources(); Context.Reset();
+        return success;
+    }
+    public static bool ReadTexture(GpuTexture texture, void* destination, uint32 capacity)
+    {
+        ResourceLock.Enter(); defer ResourceLock.Exit();
+        if (Context.HasDraws) return false;
+        uint64 size = texture.Width * texture.Height * GPU.GetTextureFormatInfo(texture.Format).bytes_per_block;
+        if (capacity < size) return false;
+        var memory = GPU.CreateGpuHeap(Device, size, .readback);
+        if (memory.range.cpu == null) return false;
+        var commands = GPU.BeginCommands(UploadPool);
+        GPU.CopyTextureToMemory(commands, texture.Texture, GPU.GpuRange(memory), .());
+        GPU.Barrier(commands, .transfer, .transfer_write, .host, .host_read);
+        SubmitUpload(commands); Internal.MemCpy(destination, memory.range.cpu, (.)size); GPU.DestroyGpuHeap(memory);
+        return true;
+    }
+    public static RenderViewState GetView(uint16 id) => Context.Views[id];
+    public static Shader GetShader(RenderShaderType type) => shaders[(int)type];
+    public static void PreInitialize() {}
+    public static bool Initialize(int maxBatchCount = 128)
+    {
+        batchRenderer = new .(); entityBatchRenderer = new .();
+        batchVertexLayout.Begin(); batchVertexLayout.Add(.Position, 3, .Float); batchVertexLayout.End();
+        CreateQuad(1, 1, maxBatchCount, out batchVertexBufferHandle, out batchIndexBufferHandle, out batchVertexCount, out batchIndexCount);
+        CreateQuad(2, 2, maxBatchCount, out batchTesselatedVertexBufferHandle, out batchTesselatedIndexBufferHandle, out batchTesselatedVertexCount, out batchTesselatedIndexCount);
+        shaders[(int)RenderShaderType.Font] = ResourceManager.GetResource<Shader>("shaders/font_sprite_texture");
+        Resize(width, height);
+        return true;
+    }
+    public static void Resize(int newWidth, int newHeight)
+    {
+        width = newWidth; height = newHeight; ooWidth = 1.0f / Math.Max(1, width); ooHeight = 1.0f / Math.Max(1, height);
+        aspectRatio = width * ooHeight; viewBounds = .(.Zero, .(width, height));
+        if (temporaryRenderTextureWithDepth == null) temporaryRenderTextureWithDepth = new .(width, height, .rgba16_float, .d24_unorm_s8_uint);
+        else temporaryRenderTextureWithDepth.Resize(width, height);
+    }
+    public static void Finalize()
+    {
+        DebugDraw3D.Finalize();
+        delete batchRenderer; delete entityBatchRenderer; delete temporaryRenderTextureWithDepth; delete readBackTextureHandle;
+        batchRenderer = null; entityBatchRenderer = null; temporaryRenderTextureWithDepth = null; readBackTextureHandle = null;
+        batchVertexBufferHandle.Dispose(); batchIndexBufferHandle.Dispose(); batchTesselatedVertexBufferHandle.Dispose(); batchTesselatedIndexBufferHandle.Dispose();
+    }
+    public static void OnPreRender(float timeStep)
+    {
+        PreViewId = 0; ViewId = 60; PostViewId = 100; statistics.Clear();
+        ShaderData = .((float)Time.Time, (float)(Time.Time * 0.1), timeStep, timeStep != 0 ? 1.0f / timeStep : 0);
+    }
+    public static void OnPostRender() {}
+    public static uint16 NextPreViewId() => ++PreViewId;
+    public static uint16 NextViewId() => ++ViewId;
+    public static uint16 NextPostViewId() => ++PostViewId;
+    public static void SetViewRectangle(uint16 id, uint16 x, uint16 y, uint16 viewWidth, uint16 viewHeight)
+    { GetView(id).Viewport = .() { x = x, y = y, width = viewWidth, height = viewHeight }; }
+    public static void FixProjectionMatrix(ref Matrix4 projection) { projection.d[5] = -projection.d[5]; projection.v.m31 = -projection.v.m31; }
+    public static CullMode GetCullingState(bool counterClockwise) => counterClockwise ? .clockwise : .counter_clockwise;
+    public static Matrix4 CreatePerspectiveOrtho(float left, float right, float bottom, float top, float near, float far, float offset = 0)
+    { var projection = Matrix4.CreatePerspectiveOrtho(left, right, bottom, top, near, far, offset, false); FixProjectionMatrix(ref projection); return projection; }
+    public static void Draw(uint16 viewId, Shader shader, int programIndex, GpuBuffer vertices, GpuBuffer indices, uint32 vertexCount, uint32 indexCount,
+        Matrix4 world, Vector4 color, Vector4 settings, GpuTexture[] textures = null, RenderState? state = null, SamplerDesc? sampler = null,
+        Vector4* instances = null, int instanceCount = 0, Vector4 textureScale = .Zero, void* storage = null, bool lines = false, Span<uint8> parameters = default)
+    {
+        DrawConstants constants = .() { World = world, Color = color, Time = ShaderData, Settings = settings, TextureScale = textureScale };
+        constants.Instances = (.)Context.Upload(instances, (uint64)instanceCount * sizeof(Vector4));
+        constants.SphericalHarmonics = (.)Context.Upload(&sh9.sh[0].x, 9 * sizeof(Vector4));
+        constants.Parameters = Context.Upload(parameters.Ptr, (.)parameters.Length);
+        uint32 samplerIndex = GetSampler(sampler.GetValueOrDefault(LinearClamp));
+        for (int index = 0; index < 8; ++index)
+        {
+            constants.Textures[index] = textures != null && index < textures.Count && textures[index] != null ? textures[index].Descriptor : whiteTexture.Descriptor;
+            constants.Samplers[index] = samplerIndex;
+        }
+        Context.Enqueue(viewId, shader.Programs[programIndex], vertices, indices, vertexCount, indexCount, constants, state.GetValueOrDefault(.Alpha), storage, lines);
+        ++statistics.submitCount;
+    }
+    public static void RenderMeshes(uint16 viewId, Matrix4 world, Shader shader, int quadCount, Vector4* instances, int instanceCount,
+        Vector4 settings, Vector4 textureScale, GpuTexture[] textures, RenderState? state = null, SamplerDesc? sampler = null, int programIndex = 0, bool tesselated = false)
+    {
+        Draw(viewId, shader, programIndex, tesselated ? batchTesselatedVertexBufferHandle : batchVertexBufferHandle,
+            tesselated ? batchTesselatedIndexBufferHandle : batchIndexBufferHandle,
+            (uint32)(quadCount * (tesselated ? batchTesselatedVertexCount : batchVertexCount)), (uint32)(quadCount * (tesselated ? batchTesselatedIndexCount : batchIndexCount)),
+            world, .One, settings, textures, state, sampler, instances, instanceCount, textureScale);
+    }
+    public static void RenderScreenQuad(uint16 viewId, Shader shader, GpuTexture[] textures, RenderState? state = null, SamplerDesc? sampler = null, int programIndex = 0)
+    { Draw(viewId, shader, programIndex, batchVertexBufferHandle, batchIndexBufferHandle, 4, 6, .Identity, .One, .Zero, textures, state, sampler); }
+    public static void RenderScreenQuad(uint16 viewId, Shader shader, GpuTexture texture, RenderState? state = null, SamplerDesc? sampler = null, int programIndex = 0)
+    { RenderScreenQuad(viewId, shader, scope GpuTexture[](texture), state, sampler, programIndex); }
+    public static void BlitWithShader(uint16 viewId, Shader shader, RenderTexture target, GpuTexture[] textures, RenderState? state = null, SamplerDesc? sampler = null, bool clear = true, int shiftScale = 0, int programIndex = 0)
+    {
+        var view = GetView(viewId); view.Target = target; view.ClearColorBuffer = clear; view.ClearDepthBuffer = clear; view.Active = true;
+        view.Viewport = .() { width = target.Width >> shiftScale, height = target.Height >> shiftScale };
+        view.View = .Identity; view.Projection = CreatePerspectiveOrtho(0, view.Viewport.width, 0, view.Viewport.height, 0, 1);
+        RenderScreenQuad(viewId, shader, textures, state, sampler, programIndex);
+    }
+    public static void BlitWithShader(uint16 viewId, Shader shader, RenderTexture target, GpuTexture texture, RenderState? state = null, SamplerDesc? sampler = null, bool clear = true, int shiftScale = 0, int programIndex = 0)
+    { BlitWithShader(viewId, shader, target, scope GpuTexture[](texture), state, sampler, clear, shiftScale, programIndex); }
+    public static void RenderFullScreenTextureAspect(uint16 viewId, GpuTexture texture, Shader shader, RenderState? state = null, SamplerDesc? sampler = null, int programIndex = 0)
+    { Draw(viewId, shader, programIndex, default, default, 6, 0, .Identity, .One, .Zero, scope GpuTexture[](texture), state.GetValueOrDefault(.Opaque), sampler); }
+		public static void CreateQuad(int tessX, int tessY, int batchCount, out GpuBuffer outVertexBuffer, out GpuBuffer outIndexBuffer, out int vertsPerBatch, out int indicesPerBatch)
 		{
 			vertsPerBatch = (tessX + 1) * (tessY + 1);
 			indicesPerBatch = tessX * tessY * 6;
@@ -410,23 +308,8 @@ namespace GameCore
 				}
 			}
 
-			outVertexBuffer = bgfx.create_vertex_buffer(bgfx.copy(&vertices[0], (uint32)(vertices.Count * sizeof(Vector3))), &batchVertexLayout, 0);
-			outIndexBuffer = bgfx.create_index_buffer(bgfx.copy(&indices[0], (uint32)(indices.Count * sizeof(uint16))), 0);
+			outVertexBuffer = GpuBuffer.CreateVertices(&vertices[0], (uint32)(vertices.Count * sizeof(Vector3)), batchVertexLayout);
+			outIndexBuffer = GpuBuffer.CreateIndices(&indices[0], (uint32)(indices.Count * sizeof(uint16)));
 		}
 
-		public static void SetSHRenderState()
-		{
-			bgfx.set_uniform(shUniformHandle, &sh9.sh[0].x, 9);
-		}
-
-		public static void RenderFullScreenTextureAspect(uint16 viewId, bgfx.TextureHandle handle, Shader shader, bgfx.StateFlags _stateFlags = 0, bgfx.SamplerFlags _samplerFlags = 0, int programIndex = 0)
-		{
-			var stateFlags = _stateFlags != 0 ? _stateFlags : bgfx.StateFlags.WriteRgb | bgfx.StateFlags.WriteA;
-			var samplerFlags = _samplerFlags != 0 ? (uint32)_samplerFlags : (uint32)(bgfx.SamplerFlags.UClamp | bgfx.SamplerFlags.VClamp | bgfx.SamplerFlags.Point);
-			bgfx.set_vertex_count(6);
-			bgfx.set_texture(0, RenderManager.textureUniformHandles[0], handle, (uint32)samplerFlags);
-			bgfx.set_state((uint64)bgfx.StateFlags.WriteRgb, (uint32)stateFlags);
-			bgfx.submit(viewId, shader.Programs[programIndex], 0, (uint8)bgfx.DiscardFlags.All);
-		}
-	}
 }
