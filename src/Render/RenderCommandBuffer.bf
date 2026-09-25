@@ -453,9 +453,25 @@ public class RenderCommandBuffer
     public bool CopyTexture(GpuTexture source, GpuTexture destination, TextureCopyDesc sourceRegion, TextureCopyDesc destinationRegion)
     {
         RequireRecording();
+        var sourceRegion;
+        var destinationRegion;
         uint64 size = source.GetRegionByteCount(sourceRegion);
         if (size == 0 || source.Format != destination.Format || size != destination.GetRegionByteCount(destinationRegion))
             return false;
+        if (sourceRegion.row_pitch_bytes == 0 && sourceRegion.slice_pitch_bytes == 0 &&
+            destinationRegion.row_pitch_bytes == 0 && destinationRegion.slice_pitch_bytes == 0)
+        {
+            let alignedSource = AlignedCopyRegion(source, sourceRegion);
+            let alignedDestination = AlignedCopyRegion(destination, destinationRegion);
+            if (alignedSource.row_pitch_bytes == alignedDestination.row_pitch_bytes &&
+                alignedSource.slice_pitch_bytes == alignedDestination.slice_pitch_bytes &&
+                source.GetRegionByteCount(alignedSource) == destination.GetRegionByteCount(alignedDestination))
+            {
+                sourceRegion = alignedSource;
+                destinationRegion = alignedDestination;
+                size = source.GetRegionByteCount(sourceRegion);
+            }
+        }
         if (temporaryBufferIndex == temporaryBuffers.Count)
             temporaryBuffers.Add(GPU.CreateGpuHeap(device, size, .gpu_only));
         else if (temporaryBuffers[temporaryBufferIndex].range.size < size)
@@ -478,6 +494,20 @@ public class RenderCommandBuffer
         GPU.CopyMemoryToTexture(NativeCommands, GPU.GpuRange(memory), destination.Texture, destinationRegion);
         ++CopyCount;
         return true;
+    }
+
+    private static TextureCopyDesc AlignedCopyRegion(GpuTexture texture, TextureCopyDesc region)
+    {
+        var aligned = region;
+        let format = GPU.GetTextureFormatInfo(texture.Format);
+        uint64 width = region.extent.x != 0 ? region.extent.x : Math.Max(1U, texture.Width >> (int)region.mip_level) - region.offset.x;
+        uint64 height = region.extent.y != 0 ? region.extent.y : Math.Max(1U, texture.Height >> (int)region.mip_level) - region.offset.y;
+        uint64 rowBytes = (width + format.block_extent.x - 1) / format.block_extent.x * format.bytes_per_block;
+        uint64 rows = (height + format.block_extent.y - 1) / format.block_extent.y;
+        // D3D12 otherwise repacks unaligned texture copies one row at a time through scratch storage.
+        aligned.row_pitch_bytes = (rowBytes + 255) & ~255UL;
+        aligned.slice_pitch_bytes = (aligned.row_pitch_bytes * rows + 511) & ~511UL;
+        return aligned;
     }
 
     public void ReadTexture(GpuTexture source, TextureReadback readback, TextureCopyDesc region)
@@ -549,7 +579,7 @@ public class RenderCommandBuffer
         ClearDepth = 1;
         ClearColorBuffer = false;
         ClearDepthBuffer = false;
-        Name.Clear();
+        // The available pool uses the pass name to reuse its cached GPU allocations.
         Status = .Available;
     }
 }

@@ -496,7 +496,18 @@ public static class RenderManager
         PrepareFrame();
         RenderCommandBuffer buffer;
         if (availableCommandBuffers.Count > 0)
-            buffer = availableCommandBuffers.PopBack();
+        {
+            int reuseIndex = availableCommandBuffers.Count - 1;
+            // Keep pass-specific pipelines and temporary GPU allocations on the same buffers.
+            for (int index = availableCommandBuffers.Count - 1; index >= 0; --index)
+                if (availableCommandBuffers[index].Name.Equals(name))
+                {
+                    reuseIndex = index;
+                    break;
+                }
+            buffer = availableCommandBuffers[reuseIndex];
+            availableCommandBuffers.RemoveAt(reuseIndex);
+        }
         else
         {
             buffer = new .(Device);
