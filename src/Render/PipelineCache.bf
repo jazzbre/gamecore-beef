@@ -103,7 +103,8 @@ public class PipelineCache
         | (state.Blend.enabled ? 1UL << 6 : 0)
         | ((uint64)state.Blend.color.source << 7) | ((uint64)state.Blend.color.destination << 11)
         | ((uint64)state.Blend.color.operation << 15) | ((uint64)state.Blend.alpha.source << 18)
-        | ((uint64)state.Blend.alpha.destination << 22) | ((uint64)state.Blend.alpha.operation << 26);
+        | ((uint64)state.Blend.alpha.destination << 22) | ((uint64)state.Blend.alpha.operation << 26)
+        | ((uint64)state.SecondaryColorWriteMask << 29);
         Key key = .() { Program = program.Id, State = packedState, ColorCount = colors.Length, Depth = depth,
             DepthBiasConstant = state.Rasterization.depth_bias_constant, DepthBiasClamp = state.Rasterization.depth_bias_clamp,
             DepthBiasSlope = state.Rasterization.depth_bias_slope };
@@ -113,7 +114,8 @@ public class PipelineCache
             return pipeline;
         ColorTargetDesc[RenderTexture.MaxColorAttachments] targets = default;
         for (int index = 0; index < colors.Length; ++index)
-            targets[index] = .() { format = colors[index], blend = state.Blend, write_mask = state.ColorWriteMask };
+            targets[index] = index == 0 ? .() { format = colors[index], blend = state.Blend, write_mask = state.ColorWriteMask }
+                : .() { format = colors[index], blend = .(), write_mask = state.SecondaryColorWriteMask };
         GraphicsPSODesc description = .();
         description.vertex_spirv = .() { data = program.VertexCode.Ptr, size = (.)program.VertexCode.Count };
         description.fragment_spirv = .() { data = program.FragmentCode.Ptr, size = (.)program.FragmentCode.Count };

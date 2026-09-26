@@ -81,6 +81,7 @@ public static class RenderManager
         public List<GpuHeap> RetiredBuffers = new .() ~ delete _;
         public List<RetiredTexture> RetiredTextures = new .() ~ delete _;
         public List<uint32> RetiredDescriptors = new .() ~ delete _;
+        public LinearGpuMemory Memory = new .() ~ delete _;
 
         public this()
         {
@@ -444,6 +445,7 @@ public static class RenderManager
         frame.Buffers.Clear();
         CompletedFrame = Math.Max(CompletedFrame, frame.FrameNumber);
         CollectResources(frame.RetiredBuffers, frame.RetiredTextures, frame.RetiredDescriptors);
+        frame.Memory.Reset();
         GPU.ResetCommandPool(frame.Pool);
         frame.Completion = default;
     }
@@ -475,6 +477,21 @@ public static class RenderManager
         frameResources.AcquiredFrame = frame;
         frameResources.Prologue = commands;
         framePrepared = true;
+    }
+
+    public static GpuCpuRange AllocateFrameMemory(uint64 byteCount)
+    {
+        ResourceLock.Enter();
+        defer ResourceLock.Exit();
+        PrepareFrame();
+        return frames[frameIndex].Memory.Allocate(byteCount, 16);
+    }
+
+    public static GpuBuffer AllocateFrameVertices(void* source, uint32 byteCount, VertexLayout layout)
+    {
+        var allocation = AllocateFrameMemory(byteCount);
+        Internal.MemCpy(allocation.cpu, source, byteCount);
+        return .() { Memory = .() { range = allocation }, Layout = layout, Count = byteCount / layout.stride };
     }
 
     public static RenderCommandBuffer AcquireCommandBuffer(RenderTexture target = null, StringView name = default)

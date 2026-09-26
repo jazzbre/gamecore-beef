@@ -34,11 +34,9 @@ public class RenderCommandBuffer
     private Format depthFormat;
     private uint32x2 targetExtent;
     private uint64 directBarrierCount;
-    private List<GpuHeap> uploadPages = new .() ~ delete _;
+    private LinearGpuMemory uploadMemory = new .() ~ delete _;
     private List<GpuHeap> temporaryBuffers = new .() ~ delete _;
     private int temporaryBufferIndex;
-    private int pageIndex;
-    private uint64 pageOffset;
     private RenderResourceTracker resourceTracker = new .(false) ~ delete _;
     private List<RenderResourceAccess> pendingAccesses = new .() ~ delete _;
     internal List<RenderResourceAccess> ResourceSummary = new .() ~ delete _;
@@ -62,6 +60,7 @@ public class RenderCommandBuffer
     public Matrix4 Projection = .Identity;
     public Viewport Viewport = .() { width = 0, height = 0 };
     public ClearColor ClearColor;
+    public ClearColor SecondaryClearColor;
     public float ClearDepth = 1;
     public bool ClearColorBuffer;
     public bool ClearDepthBuffer;
@@ -113,8 +112,6 @@ public class RenderCommandBuffer
             completionStatus.Cancelled = true;
             completionStatus.Release();
         }
-        for (var page in uploadPages)
-            GPU.DestroyGpuHeap(page);
         for (var memory in temporaryBuffers)
             GPU.DestroyGpuHeap(memory);
         GPU.DestroyGpuHeap(timestamps);
@@ -161,20 +158,7 @@ public class RenderCommandBuffer
     public GpuCpuRange Allocate(uint64 byteCount)
     {
         RequireRecording();
-        uint64 size = (byteCount + 15) & ~15UL;
-        while (pageIndex < uploadPages.Count && pageOffset + size > uploadPages[pageIndex].range.size)
-        {
-            ++pageIndex;
-            pageOffset = 0;
-        }
-        if (pageIndex == uploadPages.Count)
-            uploadPages.Add(GPU.CreateGpuHeap(device, Math.Max(size, 4UL * 1024 * 1024), .cpu_visible));
-        var page = uploadPages[pageIndex];
-        if (page.range.cpu == null)
-            Runtime.FatalError("Unable to allocate NGA frame memory");
-        GpuCpuRange result = .() { cpu = page.range.cpu + pageOffset, gpu = page.range.gpu + pageOffset, size = byteCount };
-        pageOffset += size;
-        return result;
+        return uploadMemory.Allocate(byteCount, 16);
     }
 
     public void* Upload(void* source, uint64 byteCount)
@@ -265,7 +249,7 @@ public class RenderCommandBuffer
         for (int index = 0; index < colorAttachmentCount; ++index)
         {
             colorAttachments[index].load = !attachmentsInitialized && ClearColorBuffer ? .clear : .load;
-            colorAttachments[index].clear = ClearColor;
+            colorAttachments[index].clear = index == 0 ? ClearColor : SecondaryClearColor;
         }
         RenderingDesc rendering = .();
         rendering.colors = .() { data = &colorAttachments[0], size = (.)colorAttachmentCount };
@@ -562,8 +546,7 @@ public class RenderCommandBuffer
         resourceTracker.Reset();
         pendingAccesses.Clear();
         ResourceSummary.Clear();
-        pageIndex = 0;
-        pageOffset = 0;
+        uploadMemory.Reset();
         temporaryBufferIndex = 0;
         directBarrierCount = 0;
         HasCommands = false;
@@ -576,6 +559,7 @@ public class RenderCommandBuffer
         Projection = .Identity;
         Viewport = .() { width = 0, height = 0 };
         ClearColor = default;
+        SecondaryClearColor = default;
         ClearDepth = 1;
         ClearColorBuffer = false;
         ClearDepthBuffer = false;

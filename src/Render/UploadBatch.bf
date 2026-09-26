@@ -1,5 +1,5 @@
+using internal GameCore;
 using System;
-using System.Collections;
 using NoGraphicsAPI;
 
 namespace GameCore;
@@ -9,10 +9,8 @@ internal class UploadBatch
     public CommandPool* Pool;
     public CommandBuffer* Commands;
     public TimelinePoint Completion;
-    public uint64 ByteCount;
-    private List<GpuHeap> pages = new .() ~ delete _;
-    private int pageIndex;
-    private uint64 pageOffset;
+    private LinearGpuMemory memory = new .() ~ delete _;
+    public uint64 ByteCount => memory.ByteCount;
 
     public this()
     {
@@ -23,28 +21,12 @@ internal class UploadBatch
 
     public ~this()
     {
-        for (var page in pages)
-            GPU.DestroyGpuHeap(page);
         GPU.DestroyCommandPool(Pool);
     }
 
     public GpuCpuRange Allocate(uint64 byteCount)
     {
-        uint64 alignedSize = (byteCount + 511) & ~511UL;
-        while (pageIndex < pages.Count && pageOffset + alignedSize > pages[pageIndex].range.size)
-        {
-            ++pageIndex;
-            pageOffset = 0;
-        }
-        if (pageIndex == pages.Count)
-            pages.Add(GPU.CreateGpuHeap(RenderManager.Device, Math.Max(alignedSize, 4UL * 1024 * 1024), .cpu_visible));
-        var page = pages[pageIndex];
-        if (page.range.cpu == null)
-            Runtime.FatalError("Unable to allocate upload staging memory");
-        GpuCpuRange allocation = .() { cpu = page.range.cpu + pageOffset, gpu = page.range.gpu + pageOffset, size = byteCount };
-        pageOffset += alignedSize;
-        ByteCount += byteCount;
-        return allocation;
+        return memory.Allocate(byteCount, 512);
     }
 
     public void Reset()
@@ -52,8 +34,6 @@ internal class UploadBatch
         GPU.ResetCommandPool(Pool);
         Completion = default;
         Commands = null;
-        pageIndex = 0;
-        pageOffset = 0;
-        ByteCount = 0;
+        memory.Reset();
     }
 }

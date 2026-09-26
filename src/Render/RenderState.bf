@@ -9,6 +9,7 @@ public struct RenderState
     public RasterizationState Rasterization = .();
     public DepthStencilState Depth = .();
     public uint8 ColorWriteMask = 15;
+    public uint8 SecondaryColorWriteMask = 0;
 
     public static Self Opaque => .();
 
