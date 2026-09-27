@@ -32,6 +32,10 @@ public class RenderCommandBuffer
     private NoGraphicsAPI.Texture* depthTexture;
     private Format[RenderTexture.MaxColorAttachments] colorFormats;
     private Format depthFormat;
+    private Viewport boundViewport;
+    private DepthStencilState boundDepthStencil;
+    private bool boundViewportValid;
+    private bool boundDepthStencilValid;
     private uint32x2 targetExtent;
     private uint64 directBarrierCount;
     private LinearGpuMemory uploadMemory = new .() ~ delete _;
@@ -56,6 +60,8 @@ public class RenderCommandBuffer
     public uint32 DispatchCount { get; private set; }
     public uint32 CopyCount { get; private set; }
     public bool HasCommands { get; private set; }
+    public uint64 RecordingId { get; private set; }
+    private static uint64 nextRecordingId;
     public Matrix4 View = .Identity;
     public Matrix4 Projection = .Identity;
     public Viewport Viewport = .() { width = 0, height = 0 };
@@ -134,6 +140,9 @@ public class RenderCommandBuffer
         depthFormat = target != null ? target.DepthFormat : .undefined;
         targetExtent = target != null ? .() { x = (.)target.Width, y = (.)target.Height } : frame.extent;
         recordingSucceeded = true;
+        RecordingId = Interlocked.Increment(ref nextRecordingId);
+        boundViewportValid = false;
+        boundDepthStencilValid = false;
         recordingThreadId = 0;
         HasCommands = false;
         DrawCount = TriangleCount = DispatchCount = CopyCount = 0;
@@ -262,6 +271,8 @@ public class RenderCommandBuffer
                 rendering.stencil.render_view = depthView;
         }
         GPU.BeginRenderPass(NativeCommands, rendering, .none);
+        boundDepthStencilValid = false;
+        boundViewportValid = false;
         for (int index = 0; index < colorAttachmentCount; ++index)
             if (colorTextures[index] != null)
                 resourceTracker.RecordAttachmentWrite(colorTextures[index], .color_output, .color_write);
@@ -353,8 +364,13 @@ public class RenderCommandBuffer
         for (int attribute = 0; attribute < 18; ++attribute)
             root.Attributes[attribute] = vertices.Memory.range.gpu == null ? uint32.MaxValue : vertices.Layout.offset[attribute] | ((uint32)vertices.Layout.attributes[attribute] << 16);
         var viewport = EffectiveViewport;
-        GPU.SetViewport(NativeCommands, viewport);
-        GPU.SetScissor(NativeCommands, .() { x = (.)viewport.x, y = (.)viewport.y, width = (.)viewport.width, height = (.)viewport.height });
+        if (!boundViewportValid || Internal.MemCmp(&viewport, &boundViewport, sizeof(Viewport)) != 0)
+        {
+            GPU.SetViewport(NativeCommands, viewport);
+            GPU.SetScissor(NativeCommands, .() { x = (.)viewport.x, y = (.)viewport.y, width = (.)viewport.width, height = (.)viewport.height });
+            boundViewport = viewport;
+            boundViewportValid = true;
+        }
         GPU.BindPso(NativeCommands, pipeline);
         var depth = state.Depth;
         if (depthFormat == .undefined)
@@ -362,7 +378,12 @@ public class RenderCommandBuffer
             depth.depth_test = false;
             depth.depth_write = false;
         }
-        GPU.SetDepthStencil(NativeCommands, depth);
+        if (!boundDepthStencilValid || Internal.MemCmp(&depth, &boundDepthStencil, sizeof(DepthStencilState)) != 0)
+        {
+            GPU.SetDepthStencil(NativeCommands, depth);
+            boundDepthStencil = depth;
+            boundDepthStencilValid = true;
+        }
         ByteSpan rootBytes = .() { data = (.)&root, size = sizeof(DrawRoot) };
         if (lines)
             GPU.Draw(NativeCommands, rootBytes, (indexCount > 0 ? indexCount : vertexCount) / 2 * 6, 1, 0, 0);

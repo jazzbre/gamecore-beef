@@ -138,6 +138,9 @@ public static class RenderManager
     private static List<uint32> freeDescriptors = new .() ~ delete _;
     private static uint32 nextDescriptor;
     private static List<SamplerDesc> samplerDescriptions = new .() ~ delete _;
+    private const int MaxSamplerCount = 255;
+    private static uint64[MaxSamplerCount] publishedSamplerKeys;
+    private static int32 publishedSamplerCount;
     private static GpuTexture whiteTexture;
     public static Statistics statistics;
     public static SpriteBatchRenderer batchRenderer, entityBatchRenderer;
@@ -274,6 +277,7 @@ public static class RenderManager
         nextDescriptor = 0;
         freeDescriptors.Clear();
         samplerDescriptions.Clear();
+        Interlocked.Store(ref publishedSamplerCount, 0);
     }
 
     public static uint32 AllocateTextureDescriptor()
@@ -285,22 +289,39 @@ public static class RenderManager
         return nextDescriptor++;
     }
 
+    private static uint64 PackSamplerKey(SamplerDesc sampler)
+    {
+        return (uint64)sampler.min_filter | ((uint64)sampler.mag_filter << 7) | ((uint64)sampler.mip_filter << 14)
+            | ((uint64)sampler.address_u << 21) | ((uint64)sampler.address_v << 28) | ((uint64)sampler.address_w << 35)
+            | ((sampler.anisotropic ? 1UL : 0UL) << 42) | ((sampler.compare_enabled ? 1UL : 0UL) << 43) | ((uint64)sampler.compare << 44);
+    }
+
+    private static int32 FindPublishedSampler(uint64 key, int32 count)
+    {
+        for (int32 index = 0; index < count; ++index)
+            if (publishedSamplerKeys[index] == key)
+                return index;
+        return -1;
+    }
+
     public static uint32 GetSampler(SamplerDesc sampler)
     {
+        let key = PackSamplerKey(sampler);
+        let publishedIndex = FindPublishedSampler(key, Interlocked.Load(ref publishedSamplerCount));
+        if (publishedIndex >= 0)
+            return (.)publishedIndex;
         ResourceLock.Enter();
         defer ResourceLock.Exit();
-        for (int index = 0; index < samplerDescriptions.Count; ++index)
-        {
-            var existing = samplerDescriptions[index];
-            if (existing.min_filter == sampler.min_filter && existing.mag_filter == sampler.mag_filter && existing.mip_filter == sampler.mip_filter
-                && existing.address_u == sampler.address_u && existing.address_v == sampler.address_v && existing.address_w == sampler.address_w
-                && existing.anisotropic == sampler.anisotropic && existing.compare_enabled == sampler.compare_enabled && existing.compare == sampler.compare) return (.)index;
-        }
-        if (samplerDescriptions.Count >= 255)
+        let lockedIndex = FindPublishedSampler(key, publishedSamplerCount);
+        if (lockedIndex >= 0)
+            return (.)lockedIndex;
+        if (samplerDescriptions.Count >= MaxSamplerCount)
             Runtime.FatalError("GameCore sampler capacity exceeded");
         uint32 descriptor = (.)samplerDescriptions.Count;
         samplerDescriptions.Add(sampler);
         GPU.WriteSamplerDescriptor(Device, SamplerDescriptors.range.cpu + descriptor * GPU.GetDeviceCaps(Device).sampler_descriptor_size, sampler);
+        publishedSamplerKeys[descriptor] = key;
+        Interlocked.Store(ref publishedSamplerCount, (int32)descriptor + 1);
         return descriptor;
     }
 

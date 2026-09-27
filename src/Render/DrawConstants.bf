@@ -19,6 +19,7 @@ public struct DrawConstants
     public void* Parameters;
     public uint32[8] Textures;
     public uint32[8] Samplers;
+    public void* DrawParameters;
 }
 
 [CRepr]

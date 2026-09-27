@@ -17,6 +17,7 @@ struct DrawConstants
     GPU_PTR(uint) Parameters;
     uint Textures[8];
     uint Samplers[8];
+    GPU_PTR(uint) DrawParameters;
 };
 
 struct DrawRoot
