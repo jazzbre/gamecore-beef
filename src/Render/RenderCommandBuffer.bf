@@ -413,6 +413,25 @@ public class RenderCommandBuffer
         HasCommands = true;
     }
 
+    public void DispatchIndirect(ShaderProgram program, GpuBuffer arguments, uint64 argumentOffset, DrawConstants constants, void* storage = null)
+    {
+        RequireRecording();
+        UseBuffer(arguments, .indirect, .indirect_read);
+        PrepareShader(false);
+        var pipeline = Pipelines.GetCompute(program);
+        if (pipeline == null)
+        {
+            recordingSucceeded = false;
+            return;
+        }
+        var root = CreateRoot(constants, storage);
+        GPU.BindPso(NativeCommands, pipeline);
+        GpuRange argumentRange = .() { gpu = (uint8*)arguments.Memory.range.gpu + argumentOffset, size = 12 };
+        GPU.DispatchIndirect(NativeCommands, .() { data = (.)&root, size = sizeof(DrawRoot) }, argumentRange);
+        ++DispatchCount;
+        HasCommands = true;
+    }
+
     private void BeginTransfer()
     {
         RequireRecording();
