@@ -42,6 +42,7 @@ class ParallelRecordingChecks
             Interlocked.Increment(ref backgroundRecordings);
         for (uint32 index = startIndex; index < endIndex; ++index)
         {
+            RenderManager.UseWorkerResources(recordCompute ? computeCommands[index] : graphicsCommands[index], (int)workerIndex);
             if (recordCompute)
             {
                 var commands = computeCommands[index];

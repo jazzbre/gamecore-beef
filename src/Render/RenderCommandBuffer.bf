@@ -38,7 +38,7 @@ public class RenderCommandBuffer
     private bool boundDepthStencilValid;
     private uint32x2 targetExtent;
     private uint64 directBarrierCount;
-    private LinearGpuMemory uploadMemory = new .() ~ delete _;
+    internal LinearGpuMemory UploadMemory;
     private List<GpuHeap> temporaryBuffers = new .() ~ delete _;
     private int temporaryBufferIndex;
     private RenderResourceTracker resourceTracker = new .(false) ~ delete _;
@@ -47,7 +47,7 @@ public class RenderCommandBuffer
     internal CommandBuffer* NativeCommands;
     internal Vector4 FrameShaderData;
     internal Vector4[9] FrameSphericalHarmonics;
-    public readonly PipelineCache Pipelines ~ delete _;
+    public PipelineCache Pipelines { get; internal set; }
     public readonly CommandPool* Pool;
     public Lifecycle Status { get; internal set; }
     public RenderTexture Target { get; private set; }
@@ -105,8 +105,6 @@ public class RenderCommandBuffer
     internal this(Device* device)
     {
         this.device = device;
-        Pipelines = new .(device);
-        timestamps = GPU.CreateGpuHeap(device, 2 * sizeof(uint64), .readback);
         Pool = GPU.CreateCommandPool(device, 0);
     }
 
@@ -120,7 +118,8 @@ public class RenderCommandBuffer
         }
         for (var memory in temporaryBuffers)
             GPU.DestroyGpuHeap(memory);
-        GPU.DestroyGpuHeap(timestamps);
+        if (timestamps.owner != null)
+            GPU.DestroyGpuHeap(timestamps);
         GPU.DestroyCommandPool(Pool);
     }
 
@@ -147,6 +146,8 @@ public class RenderCommandBuffer
         HasCommands = false;
         DrawCount = TriangleCount = DispatchCount = CopyCount = 0;
         NativeCommands = GPU.BeginCommands(Pool);
+        if (ProfilingEnabled && timestamps.owner == null)
+            timestamps = GPU.CreateGpuHeap(device, 2 * sizeof(uint64), .readback);
         recordedTimings = ProfilingEnabled && timestamps.range.cpu != null && GPU.GetDeviceCaps(device).timestamp_period_ns > 0;
         if (recordedTimings)
             GPU.WriteTimestamp(NativeCommands, (.)timestamps.range.gpu, .all_commands);
@@ -167,7 +168,7 @@ public class RenderCommandBuffer
     public GpuCpuRange Allocate(uint64 byteCount)
     {
         RequireRecording();
-        return uploadMemory.Allocate(byteCount, 16);
+        return UploadMemory.Allocate(byteCount, 16);
     }
 
     public void* Upload(void* source, uint64 byteCount)
@@ -586,7 +587,7 @@ public class RenderCommandBuffer
         resourceTracker.Reset();
         pendingAccesses.Clear();
         ResourceSummary.Clear();
-        uploadMemory.Reset();
+        UploadMemory = null;
         temporaryBufferIndex = 0;
         directBarrierCount = 0;
         HasCommands = false;

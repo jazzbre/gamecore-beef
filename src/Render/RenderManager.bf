@@ -82,6 +82,8 @@ public static class RenderManager
         public List<RetiredTexture> RetiredTextures = new .() ~ delete _;
         public List<uint32> RetiredDescriptors = new .() ~ delete _;
         public LinearGpuMemory Memory = new .() ~ delete _;
+        // Indexed by job worker, like the pipeline caches; command buffers never outlive the frame they were acquired in.
+        public List<LinearGpuMemory> WorkerUploadMemory = new .() ~ DeleteContainerAndItems!(_);
 
         public this()
         {
@@ -100,6 +102,8 @@ public static class RenderManager
     private static FrameResources[] frames = new FrameResources[FramesInFlight] ~ DeleteContainerAndItems!(_);
     private static List<RenderCommandBuffer> commandBuffers = new .() ~ DeleteContainerAndItems!(_);
     private static List<RenderCommandBuffer> availableCommandBuffers = new .() ~ delete _;
+    // Indexed by job worker; each cache is only touched by the thread recording for that worker.
+    private static List<PipelineCache> workerPipelineCaches = new .() ~ DeleteContainerAndItems!(_);
     private static List<RenderCommandBuffer> submittedCommandBuffers = new .() ~ delete _;
     private static List<NoGraphicsAPI.CommandBuffer*> nativeCommandBuffers = new .() ~ delete _;
     private static int frameIndex;
@@ -248,6 +252,9 @@ public static class RenderManager
             delete buffer;
         commandBuffers.Clear();
         availableCommandBuffers.Clear();
+        for (var pipelineCache in workerPipelineCaches)
+            delete pipelineCache;
+        workerPipelineCaches.Clear();
         submittedCommandBuffers.Clear();
         nativeCommandBuffers.Clear();
         for (var frame in ref frames)
@@ -467,6 +474,8 @@ public static class RenderManager
         CompletedFrame = Math.Max(CompletedFrame, frame.FrameNumber);
         CollectResources(frame.RetiredBuffers, frame.RetiredTextures, frame.RetiredDescriptors);
         frame.Memory.Reset();
+        for (var workerMemory in frame.WorkerUploadMemory)
+            workerMemory.Reset();
         GPU.ResetCommandPool(frame.Pool);
         frame.Completion = default;
     }
@@ -515,19 +524,19 @@ public static class RenderManager
         return .() { Memory = .() { range = allocation }, Layout = layout, Count = byteCount / layout.stride };
     }
 
-    public static RenderCommandBuffer AcquireCommandBuffer(RenderTexture target = null, StringView name = default)
+    public static RenderCommandBuffer AcquireCommandBuffer(RenderTexture target = null, StringView name = default, int workerIndex = 0)
     {
-        return AcquireCommandBuffer(target, false, name);
+        return AcquireCommandBuffer(target, false, name, workerIndex);
     }
 
-    public static RenderCommandBuffer AcquireSwapchainCommandBuffer(StringView name = default)
+    public static RenderCommandBuffer AcquireSwapchainCommandBuffer(StringView name = default, int workerIndex = 0)
     {
         if (!hasSwapchain)
             Runtime.FatalError("No swapchain is available");
-        return AcquireCommandBuffer(null, true, name);
+        return AcquireCommandBuffer(null, true, name, workerIndex);
     }
 
-    private static RenderCommandBuffer AcquireCommandBuffer(RenderTexture target, bool swapchain, StringView name)
+    private static RenderCommandBuffer AcquireCommandBuffer(RenderTexture target, bool swapchain, StringView name, int workerIndex)
     {
         ResourceLock.Enter();
         defer ResourceLock.Exit();
@@ -536,7 +545,7 @@ public static class RenderManager
         if (availableCommandBuffers.Count > 0)
         {
             int reuseIndex = availableCommandBuffers.Count - 1;
-            // Keep pass-specific pipelines and temporary GPU allocations on the same buffers.
+            // Keep pass-specific temporary GPU allocations on the same buffers.
             for (int index = availableCommandBuffers.Count - 1; index >= 0; --index)
                 if (availableCommandBuffers[index].Name.Equals(name))
                 {
@@ -552,12 +561,31 @@ public static class RenderManager
             commandBuffers.Add(buffer);
         }
         buffer.Status = .Recording;
+        BindWorkerResources(buffer, workerIndex);
         buffer.ProfilingEnabled = ProfilingEnabled;
         buffer.Name.Set(name);
         buffer.FrameShaderData = ShaderData;
         Internal.MemCpy(&buffer.FrameSphericalHarmonics[0], &sh9.sh[0].x, 9 * sizeof(Vector4));
         buffer.Begin(target, swapchain, frames[frameIndex].AcquiredFrame);
         return buffer;
+    }
+
+    public static void UseWorkerResources(RenderCommandBuffer buffer, int workerIndex)
+    {
+        ResourceLock.Enter();
+        defer ResourceLock.Exit();
+        BindWorkerResources(buffer, workerIndex);
+    }
+
+    private static void BindWorkerResources(RenderCommandBuffer buffer, int workerIndex)
+    {
+        while (workerPipelineCaches.Count <= workerIndex)
+            workerPipelineCaches.Add(new .(Device));
+        var workerUploadMemory = frames[frameIndex].WorkerUploadMemory;
+        while (workerUploadMemory.Count <= workerIndex)
+            workerUploadMemory.Add(new .());
+        buffer.Pipelines = workerPipelineCaches[workerIndex];
+        buffer.UploadMemory = workerUploadMemory[workerIndex];
     }
 
     public static void SubmitCommandBuffer(RenderCommandBuffer buffer)
