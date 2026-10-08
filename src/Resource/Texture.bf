@@ -37,31 +37,6 @@ namespace GameCore
 		public static Vector2 PushToBounds(Vector2 v)
 		{
 			return .(v.x < 0.5f ? 0.0f : 1.0f, v.y < 0.5f ? 0.0f : 1.0f);
-			// Center of the 0..1 square
-			Vector2 center = .(0.5f, 0.5f);
-
-			// Direction from center
-			float dx = v.x - center.x;
-			float dy = v.y - center.y;
-
-			// If already at center, just pick an arbitrary edge
-			if (dx == 0 && dy == 0)
-				return .(0.5f, 1.0f);
-
-			// Compute scale needed to hit each boundary
-			float tX = float.PositiveInfinity;
-			if (dx > 0) tX = (1.0f - center.x) / dx;
-			else if (dx < 0) tX = (0.0f - center.x) / dx;
-
-			float tY = float.PositiveInfinity;
-			if (dy > 0) tY = (1.0f - center.y) / dy;
-			else if (dy < 0) tY = (0.0f - center.y) / dy;
-
-			// Choose smallest positive t (first edge hit)
-			float t = Math.Min(tX, tY);
-
-			// Return point on edge
-			return .(center.x + dx * t, center.y + dy * t);
 		}
 
 		public static Vector2 ClosestPointOnBounds(Vector2 v)

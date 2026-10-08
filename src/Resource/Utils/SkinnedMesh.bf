@@ -154,7 +154,7 @@ namespace GameCore
 
 			public bool Load(Stream stream)
 			{
-				let version = stream.Read<uint32>().Value;
+				stream.Seek(stream.Position + sizeof(uint32));
 				let count = stream.Read<uint32>().Value;
 				parts = new Part[count];
 				for (var i = 0; i < (int)count; ++i)
@@ -204,7 +204,7 @@ namespace GameCore
 			while (stream.Position != endPosition)
 			{
 				stream.Seek(stream.Position + 16);
-				let version = stream.Read<uint32>().Value;
+				stream.Seek(stream.Position + sizeof(uint32));
 				var subMesh = new SubMesh();
 				if (!subMesh.Load(stream))
 				{

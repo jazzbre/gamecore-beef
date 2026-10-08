@@ -143,8 +143,18 @@ namespace GameCore
             var p5 = center + Vector3(half.x, -half.y,  half.z);
             var p6 = center + Vector3(half.x,  half.y,  half.z);
             var p7 = center + Vector3(-half.x,  half.y,  half.z);
-            DrawSolidTriangle(p0, p1, p2, color);
-            DrawSolidTriangle(p0, p2, p3, color);
+            DrawSolidQuad(p0, p1, p2, p3, color);
+            DrawSolidQuad(p4, p7, p6, p5, color);
+            DrawSolidQuad(p0, p3, p7, p4, color);
+            DrawSolidQuad(p1, p5, p6, p2, color);
+            DrawSolidQuad(p0, p4, p5, p1, color);
+            DrawSolidQuad(p3, p2, p6, p7, color);
+        }
+
+        private static void DrawSolidQuad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Color color)
+        {
+            DrawSolidTriangle(a, b, c, color);
+            DrawSolidTriangle(a, c, d, color);
         }
 
         public static void Box(Vector3 center, Vector3 size, Color color)

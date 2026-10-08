@@ -43,7 +43,7 @@ namespace ImGui
 
 		public static bool InputText(StringView name, String text)
 		{
-			var idScope = scope IDScope(text);
+			scope IDScope(text);
 			var buffer = scope char8[512];
 			Internal.MemCpy(&buffer[0], text.Ptr, text.Length);
 			buffer[text.Length] = 0;
@@ -58,7 +58,7 @@ namespace ImGui
 
 		public static bool InputFloat2(StringView name, ref Vector2 v)
 		{
-			var idScope = scope IDScope(ref v);
+			scope IDScope(ref v);
 			var f = float[2](v.x, v.y);
 			if (ImGui.InputFloat2(name.Ptr, ref f))
 			{
@@ -70,7 +70,7 @@ namespace ImGui
 
 		public static bool InputFloat3(StringView name, ref Vector3 v)
 		{
-			var idScope = scope IDScope(ref v);
+			scope IDScope(ref v);
 			var f = float[3](v.x, v.y, v.z);
 			if (ImGui.InputFloat3(name.Ptr, ref f))
 			{
@@ -82,7 +82,7 @@ namespace ImGui
 
 		public static bool InputFloat4(StringView name, ref Vector4 v)
 		{
-			var idScope = scope IDScope(ref v);
+			scope IDScope(ref v);
 			var f = float[4](v.x, v.y, v.z, v.w);
 			if (ImGui.InputFloat4(name.Ptr, ref f))
 			{
@@ -94,7 +94,7 @@ namespace ImGui
 
 		public static bool InputColor(StringView name, ref GameCore.Color v)
 		{
-			var idScope = scope IDScope(ref v);
+			scope IDScope(ref v);
 			var f = float[4](v.r, v.g, v.b, v.a);
 			if (ImGui.ColorEdit4(name.Ptr, ref f, .HDR))
 			{
@@ -106,7 +106,7 @@ namespace ImGui
 
 		public static bool InputEnum(StringView name, ref int64 v, Type type)
 		{
-			var idScope = scope IDScope(ref v);
+			scope IDScope(ref v);
 			var originalV = v;
 			var enumInfo = ReflectionUtils.GetEnumInfo(type);
 			if (enumInfo == null || enumInfo.names.Count == 0)
@@ -185,19 +185,19 @@ namespace ImGui
 
 		public static bool InputProperty(StringView name, ref String v)
 		{
-			var idScope = scope IDScope(v);
+			scope IDScope(v);
 			return InputText(name, v);
 		}
 
 		public static bool InputProperty(StringView name, ref bool v)
 		{
-			var idScope = scope IDScope(ref v);
+			scope IDScope(ref v);
 			return Checkbox(name.Ptr, &v);
 		}
 
 		public static bool InputProperty(StringView name, ref int v)
 		{
-			var idScope = scope IDScope(ref v);
+			scope IDScope(ref v);
 			var i = (int32)v;
 			if (InputInt(name.Ptr, &i))
 			{
@@ -209,49 +209,49 @@ namespace ImGui
 
 		public static bool InputProperty(StringView name, ref int32 v)
 		{
-			var idScope = scope IDScope(ref v);
+			scope IDScope(ref v);
 			return InputInt(name.Ptr, &v);
 		}
 
 		public static bool InputProperty(StringView name, ref float v)
 		{
-			var idScope = scope IDScope(ref v);
+			scope IDScope(ref v);
 			return InputFloat(name.Ptr, &v);
 		}
 
 		public static bool InputProperty(StringView name, ref double v)
 		{
-			var idScope = scope IDScope(ref v);
+			scope IDScope(ref v);
 			return InputDouble(name.Ptr, &v);
 		}
 
 		public static bool InputProperty(StringView name, ref Vector2 v)
 		{
-			var idScope = scope IDScope(ref v);
+			scope IDScope(ref v);
 			return InputFloat2(name, ref v);
 		}
 
 		public static bool InputProperty(StringView name, ref Vector3 v)
 		{
-			var idScope = scope IDScope(ref v);
+			scope IDScope(ref v);
 			return InputFloat3(name, ref v);
 		}
 
 		public static bool InputProperty(StringView name, ref Vector4 v)
 		{
-			var idScope = scope IDScope(ref v);
+			scope IDScope(ref v);
 			return InputFloat4(name, ref v);
 		}
 
 		public static bool InputProperty(StringView name, ref GameCore.Color v)
 		{
-			var idScope = scope IDScope(ref v);
+			scope IDScope(ref v);
 			return InputColor(name, ref v);
 		}
 
 		public static bool InputProperty<T>(StringView name, ref T v) where T : enum
 		{
-			var idScope = scope IDScope(ref v);
+			scope IDScope(ref v);
 			var ret = InputEnum(name, ref v);
 			return ret;
 		}
