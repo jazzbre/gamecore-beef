@@ -6,13 +6,18 @@ namespace GameCore;
 
 public class Dx12ShaderCompiler : ShaderCompiler
 {
-    public String SlangExecutable = new .("slangc") ~ delete _;
     public override StringView OutputExtension => ".Direct3D12.shader";
 
     public override bool CompileStage(StringView source, StringView entryPoint, ShaderStage stage,
         List<String> defines, List<String> includeDirectories, List<uint8> bytecode, String error)
     {
         bytecode.Clear();
+        let compilerPath = scope $"{ResourceManager.buildtimeToolsPath}slangc.exe";
+        if (!File.Exists(compilerPath))
+        {
+            error.Set(scope $"Slang compiler missing: {compilerPath}");
+            return false;
+        }
         var temporaryPath = scope String();
         if (Path.GetTempFileName(temporaryPath) case .Err || temporaryPath.IsEmpty)
         {
@@ -33,9 +38,11 @@ public class Dx12ShaderCompiler : ShaderCompiler
             AppendArgument(arguments, directory);
         }
         for (var define in defines)
+        {
             AppendArgument(arguments, scope $"-D{define}");
+        }
         // Inherit compiler output so diagnostics cannot fill an unread redirected pipe.
-        if (SystemUtils.ExecuteProcess(SlangExecutable, arguments) != 0)
+        if (SystemUtils.ExecuteProcess(compilerPath, arguments) != 0)
         {
             error.Set(scope $"Slang failed for {source}, {entryPoint} ({stage})");
             return false;

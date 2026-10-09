@@ -148,6 +148,7 @@ public static class RenderManager
     private static GpuTexture whiteTexture;
     public static Statistics statistics;
     public static SpriteBatchRenderer batchRenderer, entityBatchRenderer;
+    public static SlugFontRenderer FontRenderer;
     public static RenderTexture temporaryRenderTextureWithDepth;
     public static GpuTexture readBackTextureHandle;
     public static bool capture;
@@ -742,12 +743,13 @@ public static class RenderManager
     {
         batchRenderer = new .();
         entityBatchRenderer = new .();
+        FontRenderer = new .();
         batchVertexLayout.Begin();
         batchVertexLayout.Add(.Position, 3, .Float);
         batchVertexLayout.End();
         CreateQuad(1, 1, maxBatchCount, out batchVertexBufferHandle, out batchIndexBufferHandle, out batchVertexCount, out batchIndexCount);
         CreateQuad(2, 2, maxBatchCount, out batchTesselatedVertexBufferHandle, out batchTesselatedIndexBufferHandle, out batchTesselatedVertexCount, out batchTesselatedIndexCount);
-        shaders[(int)RenderShaderType.Font] = ResourceManager.GetResource<Shader>("shaders/font_sprite_texture");
+        shaders[(int)RenderShaderType.Font] = ResourceManager.GetResource<Shader>("shaders/slug_font");
         Resize(width, height);
         return true;
     }
@@ -771,6 +773,7 @@ public static class RenderManager
         DebugDraw3D.Finalize();
         delete batchRenderer;
         delete entityBatchRenderer;
+        DeleteAndNullify!(FontRenderer);
         delete temporaryRenderTextureWithDepth;
         delete readBackTextureHandle;
         batchRenderer = null;

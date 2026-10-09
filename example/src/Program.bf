@@ -35,15 +35,13 @@ class Program
 		commands.Finish();
 	}
 
-	private static void RecordText(RenderCommandBuffer commands, GameCore.Font font, SpriteBatchRenderer batchRenderer, Shader shader)
+	private static void RecordText(RenderCommandBuffer commands, SlugFontResource font, SlugFontRenderer renderer)
 	{
-		var textTransform = Matrix4.CreateScale(2);
-		textTransform.Translation = .(32, -48, 0);
-		font.RenderText(batchRenderer, shader, commands, .Zero, textTransform, .White, "Valmore - GameCore NGA", .Black);
+		renderer.DrawText(commands, font, "Exo 2 - GameCore NGA", .(32, 64), 32, .White);
 		commands.Finish();
 	}
 
-	private static int RunHeadlessChecks()
+	private static int RunHeadlessChecks(bool fontsOnly = false)
 	{
 		if (!RenderManager.InitializeDevice(null))
 			return 1;
@@ -58,11 +56,27 @@ class Program
 		if (!RenderManager.Initialize())
 			return 1;
 		defer RenderManager.Finalize();
-		return RenderChecks.Run() ? 0 : 1;
+		return (fontsOnly ? SlugFontChecks.Run() : RenderChecks.Run()) ? 0 : 1;
 	}
 
 	public static int Main(String[] arguments)
 	{
+		if (arguments.Count == 2 && arguments[0] == "--validate-slug-font")
+		{
+			let bytes = scope System.Collections.List<uint8>();
+			let fontData = scope SlugFontData();
+			if (File.ReadAll(arguments[1], bytes) case .Err || !fontData.Read(.(bytes.Ptr, bytes.Count)))
+			{
+				Console.WriteLine("Invalid Slug font: {}", fontData.Error);
+				return 1;
+			}
+			Console.WriteLine("Valid Slug font: {} glyphs", fontData.GlyphCount);
+			return 0;
+		}
+		if (arguments.Count > 0 && arguments[0] == "--slug-font-test")
+		{
+			return RunHeadlessChecks(true);
+		}
 		if (arguments.Count > 0 && arguments[0] == "--headless-smoke-test")
 			return RunHeadlessChecks();
 		bool smokeTest = arguments.Count > 0 && arguments[0] == "--smoke-test";
@@ -100,8 +114,8 @@ class Program
 		if (!RenderManager.Initialize())
 			return 1;
 		defer RenderManager.Finalize();
-		var valmoreFont = ResourceManager.GetResource<GameCore.Font>("fonts/valmore");
-		if (valmoreFont == null || valmoreFont.FontGlyphs.Count == 0 || valmoreFont.FontTexture?.Handle == null)
+		var font = ResourceManager.GetResource<SlugFontResource>("fonts/exo2-black");
+		if (font == null || !font.HasFont)
 			return 1;
 		var shader = ResourceManager.GetResource<Shader>("shaders/example");
 		if (shader == null || shader.Programs.Count == 0)
@@ -120,14 +134,13 @@ class Program
 		var multipleTargetShader = ResourceManager.GetResource<Shader>("shaders/multiple_targets");
 		if (multipleTargetShader == null || multipleTargetShader.Programs.Count == 0)
 			return 1;
-		var textBatchRenderer = scope SpriteBatchRenderer();
-		var fontShader = RenderManager.GetShader(.Font);
+		var textRenderer = scope SlugFontRenderer();
 		RenderCommandBuffer targetCommands = null;
 		RenderCommandBuffer screenCommands = null;
 		RenderCommandBuffer textCommands = null;
 		var triangleRecordingJob = JobSystem.CreateJob(new [&] (startIndex, endIndex, workerIndex) => RecordTriangle(targetCommands, mesh, multipleTargetShader));
 		var screenRecordingJob = JobSystem.CreateJob(new [&] (startIndex, endIndex, workerIndex) => RecordScreen(screenCommands, mesh, shader, target));
-		var textRecordingJob = JobSystem.CreateJob(new [&] (startIndex, endIndex, workerIndex) => RecordText(textCommands, valmoreFont, textBatchRenderer, fontShader));
+		var textRecordingJob = JobSystem.CreateJob(new [&] (startIndex, endIndex, workerIndex) => RecordText(textCommands, font, textRenderer));
 		var pixels = scope uint8[128 * 128 * 4];
 		bool quitting = false;
 		int frameCount = 0;

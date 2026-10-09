@@ -4,7 +4,7 @@ The `NGA` branch uses `NoGraphicsAPI-beef` directly from Beef and targets DX12 o
 
 ## Build
 
-Build the native libraries in the sibling dependencies first, including the DX12 branch of `NoGraphicsAPI-beef` and the `NGA` branch of `imgui-nga-beef`. From this repository root, build with Beef, then run from `example/` with Slang (`slangc`) on PATH:
+Build the native libraries in the sibling dependencies first, including the DX12 branch of `NoGraphicsAPI-beef` and the `NGA` branch of `imgui-nga-beef`. Slang and the font converter are bundled in `example/buildtime/tools/windows/`. From this repository root, build with Beef, then run from `example/`:
 
 ```bat
 beefbuild -config=Debug -platform=Win64
@@ -14,7 +14,25 @@ cd example
 
 Use `-config=Release` for Release. Building Beef does not compile assets. The example uses its current working directory as the resource root. Run it from `example/`; the IDE working directory is already set to that project directory. The smoke test reads pixels back from the GPU and checks meshes, command buffer submission order, depth, texture sampling, debug lines, skinning, sprites, alpha blending, resize, and pipeline cache reuse.
 
-The interactive example acquires its triangle, screen, and text command buffers on the main thread, records and finishes them in three reusable jobs, then joins and submits in that order. ImGui remains on the main thread, and the text job owns a separate sprite batcher. The scheduler may also execute pending jobs on the main thread while it joins. The example draws Valmore text above the triangle through `Font.RenderText`. Its `.fnt` and PNG atlas are copied from Bramorr into `example/buildtime/resources/fonts/` and built into hashed runtime assets on startup. The font atlas uses the existing `texturec` tool. The smoke test also compares rendered text pixels against the atlas glyphs. Use `--headless-smoke-test` from the same directory to run the offscreen GPU checks without a window or presentation/VSync.
+The interactive example acquires its triangle, screen, and text command buffers on the main thread, records and finishes them in three reusable jobs, then joins and submits in that order. ImGui remains on the main thread, and the text job owns a separate `SlugFontRenderer`. The scheduler may also execute pending jobs on the main thread while it joins. The example draws Exo 2 text above the triangle. Use `--headless-smoke-test` from `example/` to run the offscreen GPU checks without a window or presentation/VSync, or `--slug-font-test` for the focused font checks.
+
+## Fonts
+
+Game text uses prebuilt Slug vector outlines. Place a static TTF/OTF or `.slugfont` file in `buildtime/resources/fonts/`. `SlugFontResourceBuilder` converts sources with `buildtime/tools/windows/slugconvert.exe`, using the Latin character preset, and copies validated prebuilt files directly. Slang also runs exclusively from this project-local tool directory. Copy the tools and their accompanying DLLs and notices into each game's `buildtime/tools/windows/`; neither builder searches PATH or sibling tool projects. Updated font sources or converter executables trigger rebuilding. Packaged runtime builds require only the hashed `.slugfont` file and resource list.
+
+Copy `slug_font.slang`, `slug_font.slang.json`, `LICENSE.slug.txt`, and the usual `gamecore.slang` include from the example shaders into each game's shader directory. The shader manifest builds screen and world billboard variants. Slug uses two point-sampled RGBA32F textures, exact texel loads, half-pixel quad dilation, and premultiplied alpha. The supplied Exo 2 Latin asset uses about 35 MiB of texture data; it supports 543 glyphs and 44,440 kerning pairs. ImGui retains its own font system.
+
+```beef
+let font = ResourceManager.GetResource<SlugFontResource>("fonts/exo2-black");
+let size = 32.0f;
+let extents = font.GetTextExtents("AV čšž", size);
+RenderManager.FontRenderer.DrawText(commands, font, "AV čšž", .(16, 48), size, .White);
+RenderManager.FontRenderer.DrawWorldText(commands, font, "Ship", position, size, .White);
+```
+
+Screen positions specify a baseline in pixels from the top-left of the viewport; world positions anchor text that keeps its pixel size and faces the screen. Font size is the em-square size in pixels. `font.Data.Ascent`, `Descent`, and `LineHeight` are em-space metrics; multiply them by size. Text is decoded as Unicode, adjacent glyphs use baked kerning, line feeds advance by line height, CR is ignored, and tabs advance to four-space stops. Missing characters use the baked fallback. Optional `FontFlags` align the text, and the default one-pixel black shadow can be disabled with `shadowColor: .(0, 0, 0, 0)`. Allocate one renderer per concurrent recording job; the shared renderer is for serial use. ResourceManager owns font resources.
+
+`SlugFontData.Read` validates the binary structure, CRC32, glyph metadata, Unicode mappings, kerning, finite texture values, and band/curve references before texture upload. The example's `--validate-slug-font path` runs those checks without a graphics device. The font GPU checks cover Unicode, scaling, layout, corruption, screen/world text, and premultiplied alpha. Set `GAMECORE_SLUG_CAPTURE` to an output filename to save the 768x384 RGBA8 readback for inspection.
 
 ## Rendering
 

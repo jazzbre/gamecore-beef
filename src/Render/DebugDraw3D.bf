@@ -33,7 +33,9 @@ namespace GameCore
 
         private static GpuBuffer huge_index_buffer = .Null;
 
-        public static Font DebugFont { get; set; } = null;
+        public static SlugFontResource DebugFont { get; set; } = null;
+        public static float DebugFontSize { get; set; } = 32.0f;
+        public static float DebugFontBaselineHeight => DebugFont?.Data != null ? DebugFont.Data.Ascent * DebugFontSize : DebugFontSize;
 
         public static void DrawSegment(Vector3 a, Vector3 b, Color color)
         {
@@ -283,10 +285,14 @@ namespace GameCore
             {
                 return;
             }
-            var matrix = Matrix4.Identity;
-            var modelViewMatrix = Matrix4.Identity;
-            modelViewMatrix.Translation = debugText.position;
-            DebugFont.RenderText(RenderManager.batchRenderer, RenderManager.GetShader(.Font), commandBuffer, .Zero, matrix, debugText.color, debugText.text, .Black, shaderProgramIndex, 0, null, modelViewMatrix);
+            if (shaderProgramIndex == 0)
+            {
+                RenderManager.FontRenderer.DrawText(commandBuffer, DebugFont, debugText.text, debugText.position.xy, DebugFontSize, debugText.color);
+            }
+            else
+            {
+                RenderManager.FontRenderer.DrawWorldText(commandBuffer, DebugFont, debugText.text, debugText.position, DebugFontSize, debugText.color);
+            }
         }
 
         public static void Render(RenderCommandBuffer commandBuffer, bool render = true, Camera camera = null)
@@ -330,6 +336,7 @@ namespace GameCore
 
         public static void Finalize()
         {
+            DebugFont = null;
             huge_index_buffer.Dispose();
             huge_index_buffer = .Null;
             Clear();

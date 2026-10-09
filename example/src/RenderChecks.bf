@@ -49,9 +49,9 @@ static class RenderChecks
         var mesh = ResourceManager.GetResource<Shader>("shaders/mesh");
         var fullscreen = ResourceManager.GetResource<Shader>("shaders/fullscreen_aspect_texture");
         var debug = ResourceManager.GetResource<Shader>("shaders/debug_draw3d");
-        var font = ResourceManager.GetResource<Shader>("shaders/font_sprite_texture");
-        if (mesh == null || fullscreen == null || debug == null || font == null || mesh.Programs.Count < 2
-            || fullscreen.Programs.Count == 0 || debug.Programs.Count == 0 || font.Programs.Count == 0) return false;
+        var sprite = ResourceManager.GetResource<Shader>("shaders/sprite_texture");
+        if (mesh == null || fullscreen == null || debug == null || sprite == null || mesh.Programs.Count < 2
+            || fullscreen.Programs.Count == 0 || debug.Programs.Count == 0 || sprite.Programs.Count == 0) return false;
 
         var cache = scope PipelineCache(RenderManager.Device);
         var first = cache.Get(mesh.Programs[0], .rgba8_unorm, .undefined, .Opaque);
@@ -136,7 +136,7 @@ static class RenderChecks
         var spriteVertices = commands5.TransientVertices(&quad, sizeof(Vector3) * 6, layout);
         Vector4[4] instances = .(.(1,0,0,32), .(0,-1,0,-32), .(0,0,1,1), .(0,0,1,1));
         SetTarget(commands5, sampled);
-        RenderManager.Draw(commands5, font, 0, spriteVertices, default, 6, 0, .Identity, .One, .Zero, state: .Opaque,
+        RenderManager.Draw(commands5, sprite, 0, spriteVertices, default, 6, 0, .Identity, .One, .Zero, state: .Opaque,
             instances: &instances, instanceCount: 4, textureScale: .(32,32,0,0));
         commands5.Finish();
         RenderManager.SubmitCommandBuffer(commands5);
@@ -162,10 +162,10 @@ static class RenderChecks
         if (!RenderManager.Frame() || !ReadColor(sampled, pixels, 48, 40, 0))
             return false;
 
-        if (!CheckCommandBufferRecycling(mesh, nearVertices) || !CheckValmoreFont()
+        if (!CheckCommandBufferRecycling(mesh, nearVertices) || !SlugFontChecks.Run()
             || !SynchronizationChecks.Run(mesh, nearVertices) || !MultipleTargetChecks.Run(nearVertices, farVertices, fullscreen))
             return false;
-        Console.WriteLine("Pipeline cache, command buffer ordering, depth, sampling, lines, skinning, sprites, blending, resize, and Valmore font checks passed");
+        Console.WriteLine("Pipeline cache, command buffer ordering, depth, sampling, lines, skinning, sprites, blending, resize, and Slug font checks passed");
         return true;
     }
 
@@ -239,52 +239,4 @@ static class RenderChecks
         return true;
     }
 
-    static bool CheckValmoreFont()
-    {
-        var font = ResourceManager.GetResource<GameCore.Font>("fonts/valmore");
-        if (font == null || font.FontTexture?.Handle == null)
-            return false;
-        var target = scope RenderTexture(128, 64);
-        var commands8 = RenderManager.AcquireCommandBuffer(target);
-        SetTarget(commands8, target);
-        var transform = Matrix4.CreateTranslation(8, -32, 0);
-        font.RenderText(RenderManager.batchRenderer, RenderManager.GetShader(.Font), commands8, .Zero,
-            transform, .(0, 1, 0, 1), "Valmore", .(0, 0, 0, 0));
-        commands8.Finish();
-        RenderManager.SubmitCommandBuffer(commands8);
-        if (!RenderManager.Frame())
-            return false;
-        var renderedPixels = scope uint8[128 * 64 * 4];
-        var atlasPixels = scope uint8[font.FontTexture.Width * font.FontTexture.Height * 4];
-        if (!RenderManager.ReadTexture(target.TextureHandle, renderedPixels.Ptr, (.)renderedPixels.Count)
-            || !RenderManager.ReadTexture(font.FontTexture.Handle, atlasPixels.Ptr, (.)atlasPixels.Count)) return false;
-        var expectedCoverage = scope uint8[128 * 64];
-        int characterPosition = 8;
-        int visiblePixels = 0;
-        for (var character in (StringView)"Valmore")
-        {
-            if (!font.FontGlyphs.TryGetValue((char32)character, let glyph))
-                return false;
-            for (int y = 0; y < glyph.height; ++y)
-                for (int x = 0; x < glyph.width; ++x)
-            {
-                int destination = (32 - font.FontData.baseHeight + glyph.yOffset + y) * 128 + characterPosition + glyph.xOffset + x;
-                int source = ((glyph.y + y) * font.FontTexture.Width + glyph.x + x) * 4;
-                expectedCoverage[destination] = atlasPixels[source + 3];
-            }
-            characterPosition += glyph.xAdvance;
-        }
-        for (int index = 0; index < expectedCoverage.Count; ++index)
-        {
-            if (expectedCoverage[index] > 0)
-                ++visiblePixels;
-            if (Math.Abs((int)renderedPixels[index * 4 + 1] - expectedCoverage[index]) > 1
-                || renderedPixels[index * 4] != 0 || renderedPixels[index * 4 + 2] != 0)
-            {
-                Console.WriteLine("Valmore font pixel mismatch at {}, {}", index % 128, index / 128);
-                return false;
-            }
-        }
-        return visiblePixels > 100;
-    }
 }
