@@ -136,6 +136,8 @@ public static class RenderManager
     public static GpuHeap TextureDescriptors, SamplerDescriptors;
     private static TimelinePoint completion;
     private static bool hasSwapchain;
+    private static FrameCapture pendingFrameCapture;
+    private static FrameCapture activeFrameCapture;
     private static List<GpuHeap> retiredBuffers = new .() ~ delete _;
     private static List<RetiredTexture> retiredTextures = new .() ~ delete _;
     private static List<uint32> retiredDescriptors = new .() ~ delete _;
@@ -163,6 +165,33 @@ public static class RenderManager
     public static Shader[] shaders = new Shader[(int)RenderShaderType.Last] ~ delete _;
     public static SH9 sh9 = new .() ~ delete _;
     public typealias OverlayRenderer = function void(CommandBuffer* commands, uint32x2 extent, TimelinePoint completion);
+    public typealias FramePresenter = function void(RenderCommandBuffer commands, GpuTexture image);
+
+    public static FrameCapture CaptureNextFrame(FramePresenter presenter)
+    {
+        ResourceLock.Enter();
+        defer ResourceLock.Exit();
+        if (!hasSwapchain || presenter == null || pendingFrameCapture != null || activeFrameCapture != null)
+        {
+            return null;
+        }
+        pendingFrameCapture = new .(presenter);
+        return pendingFrameCapture;
+    }
+
+    internal static void CancelFrameCapture(FrameCapture capture)
+    {
+        ResourceLock.Enter();
+        defer ResourceLock.Exit();
+        if (pendingFrameCapture == capture)
+        {
+            pendingFrameCapture = null;
+        }
+        if (activeFrameCapture == capture)
+        {
+            activeFrameCapture = null;
+        }
+    }
 
     public static SamplerDesc LinearClamp
     {
@@ -244,6 +273,16 @@ public static class RenderManager
         defer ResourceLock.Exit();
         if (Device == null)
             return;
+        if (pendingFrameCapture != null)
+        {
+            pendingFrameCapture.cancelled = true;
+            pendingFrameCapture = null;
+        }
+        if (activeFrameCapture != null)
+        {
+            activeFrameCapture.cancelled = true;
+            activeFrameCapture = null;
+        }
         WaitForIdle();
         GPU.WaitIdle(Device);
         delete whiteTexture;
@@ -493,16 +532,26 @@ public static class RenderManager
         if (frameResources.RecordedTimings)
             GPU.WriteTimestamp(commands, (.)frameResources.Timestamps.range.gpu, .all_commands);
         SwapchainFrame frame = hasSwapchain ? GPU.Acquire(commands) : default;
+        if (pendingFrameCapture != null && frame.render_view != null && frame.extent.x > 0 && frame.extent.y > 0)
+        {
+            activeFrameCapture = pendingFrameCapture;
+            pendingFrameCapture = null;
+            activeFrameCapture.Initialize(frame.extent);
+        }
         if (frame.render_view != null)
         {
             // Overlay-only frames need an initialized swapchain image before loading it.
             ColorAttachment initialColor = .();
-            initialColor.render_view = frame.render_view;
+            initialColor.render_view = activeFrameCapture != null ? activeFrameCapture.Target.TextureHandle.View : frame.render_view;
             initialColor.load = .clear;
             RenderingDesc initialRendering = .();
             initialRendering.colors = .() { data = &initialColor, size = 1 };
             GPU.BeginRenderPass(commands, initialRendering, .none);
             GPU.EndRenderPass(commands);
+            if (activeFrameCapture != null)
+            {
+                ResourceTracker.RecordAttachmentWrite(activeFrameCapture.Target.TextureHandle.Texture, .color_output, .color_write);
+            }
         }
         GPU.EndCommands(commands);
         frameResources.AcquiredFrame = frame;
@@ -567,7 +616,8 @@ public static class RenderManager
         buffer.Name.Set(name);
         buffer.FrameShaderData = ShaderData;
         Internal.MemCpy(&buffer.FrameSphericalHarmonics[0], &sh9.sh[0].x, 9 * sizeof(Vector4));
-        buffer.Begin(target, swapchain, frames[frameIndex].AcquiredFrame);
+        buffer.Begin(target, swapchain, frames[frameIndex].AcquiredFrame,
+            swapchain && activeFrameCapture != null ? activeFrameCapture.Target.TextureHandle : null);
         return buffer;
     }
 
@@ -623,6 +673,33 @@ public static class RenderManager
                 CompleteFrame(frames[(frameIndex + offset) % FramesInFlight], .Explicit);
     }
 
+    private static bool AppendSubmittedCommands(FrameResources frameResources)
+    {
+        bool success = true;
+        for (var buffer in submittedCommandBuffers)
+        {
+            ResourceTracker.BeginCommand();
+            for (var access in buffer.ResourceSummary)
+            {
+                ResourceTracker.Add(access);
+            }
+            if (ResourceTracker.Prepare())
+            {
+                var barrierCommands = GPU.BeginCommands(frameResources.Pool);
+                ResourceTracker.Emit(barrierCommands);
+                GPU.EndCommands(barrierCommands);
+                nativeCommandBuffers.Add(barrierCommands);
+            }
+            nativeCommandBuffers.Add(buffer.NativeCommands);
+            success &= buffer.RecordingSucceeded;
+            Synchronization.BarrierCount += buffer.BarrierCount;
+            buffer.Status = .InFlight;
+            frameResources.Buffers.Add(buffer);
+        }
+        submittedCommandBuffers.Clear();
+        return success;
+    }
+
     public static bool Frame(OverlayRenderer overlay = null)
     {
         ResourceLock.Enter();
@@ -637,26 +714,8 @@ public static class RenderManager
         var frame = frameResources.AcquiredFrame;
         nativeCommandBuffers.Add(frameResources.Prologue);
         CommandBuffer* commands;
-        bool success = true;
-        for (var buffer in submittedCommandBuffers)
-        {
-            ResourceTracker.BeginCommand();
-            for (var access in buffer.ResourceSummary)
-                ResourceTracker.Add(access);
-            if (ResourceTracker.Prepare())
-            {
-                commands = GPU.BeginCommands(frameResources.Pool);
-                ResourceTracker.Emit(commands);
-                GPU.EndCommands(commands);
-                nativeCommandBuffers.Add(commands);
-            }
-            nativeCommandBuffers.Add(buffer.NativeCommands);
-            success &= buffer.RecordingSucceeded;
-            Synchronization.BarrierCount += buffer.BarrierCount;
-            buffer.Status = .InFlight;
-            frameResources.Buffers.Add(buffer);
-        }
-        submittedCommandBuffers.Clear();
+        bool success = AppendSubmittedCommands(frameResources);
+        let capturedFrame = activeFrameCapture;
         completion.value++;
         commands = GPU.BeginCommands(frameResources.Pool);
         if (overlay != null && frame.render_view != null)
@@ -665,17 +724,38 @@ public static class RenderManager
             GPU.SetTextureDescriptorHeap(commands, GPU.GpuRange(TextureDescriptors));
             GPU.SetSamplerDescriptorHeap(commands, GPU.GpuRange(SamplerDescriptors));
             ColorAttachment color = .();
-            color.render_view = frame.render_view;
+            color.render_view = capturedFrame != null ? capturedFrame.Target.TextureHandle.View : frame.render_view;
             RenderingDesc rendering = .();
             rendering.colors = .() { data = &color, size = 1 };
             GPU.BeginRenderPass(commands, rendering, .none);
             overlay(commands, frame.extent, completion);
             GPU.EndRenderPass(commands);
         }
-        if (frameResources.RecordedTimings)
+        if (frameResources.RecordedTimings && capturedFrame == null)
             GPU.WriteTimestamp(commands, (uint64*)frameResources.Timestamps.range.gpu + 1, .all_commands);
         GPU.EndCommands(commands);
         nativeCommandBuffers.Add(commands);
+        if (capturedFrame != null)
+        {
+            capturedFrame.FrameNumber = submittedFrames;
+            activeFrameCapture = null;
+            let presentation = AcquireSwapchainCommandBuffer("Frame capture presentation");
+            presentation.ClearColorBuffer = true;
+            presentation.ClearDepthBuffer = false;
+            presentation.Viewport = .() { width = (uint16)frame.extent.x, height = (uint16)frame.extent.y };
+            capturedFrame.Readback = new .(presentation, capturedFrame.Target.TextureHandle);
+            capturedFrame.Presenter(presentation, capturedFrame.Target.TextureHandle);
+            presentation.Finish();
+            SubmitCommandBuffer(presentation);
+            success &= AppendSubmittedCommands(frameResources);
+            if (frameResources.RecordedTimings)
+            {
+                commands = GPU.BeginCommands(frameResources.Pool);
+                GPU.WriteTimestamp(commands, (uint64*)frameResources.Timestamps.range.gpu + 1, .all_commands);
+                GPU.EndCommands(commands);
+                nativeCommandBuffers.Add(commands);
+            }
+        }
         SubmitDesc submission = .();
         submission.commands = .() { data = nativeCommandBuffers.Ptr, size = (.)nativeCommandBuffers.Count };
         submission.completion = completion;

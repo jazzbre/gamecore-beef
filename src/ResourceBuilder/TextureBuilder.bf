@@ -7,6 +7,12 @@ namespace GameCore
 	[Reflect(.Methods), AlwaysInclude(AssumeInstantiated = true, IncludeAllMethods = true)]
 	public class TextureBuilder : ResourceBuilder
 	{
+		[AlwaysInclude(AssumeInstantiated = true, IncludeAllMethods = true), Reflect]
+		private class TextureBuildOptions
+		{
+			[JSON_Beef.Serialized] public bool Srgb;
+		}
+
 		public static readonly char8[] XmlSplits = new char8[](' ', '\"', '<', '>') ~ delete _;
 		private readonly List<Vector2> convexHullPoints = new .() ~ delete _;
 		private readonly List<Vector2> convexHullVertices = new .() ~ delete _;
@@ -18,13 +24,75 @@ namespace GameCore
 
 		public override Type ResourceType => typeof(Texture);
 
+		private void GetConverterPath(String path)
+		{
+#if BF_PLATFORM_WINDOWS
+			path.Set(scope $"{ResourceManager.buildtimeToolsPath}texturec.exe");
+#else
+			path.Set(scope $"{ResourceManager.buildtimeToolsPath}texturec");
+#endif
+		}
+
+		private bool TryReadSrgbOption(StringView path, out bool srgb)
+		{
+			srgb = false;
+			let optionsPath = scope $"{path}.options";
+			if (!File.Exists(optionsPath))
+			{
+				return true;
+			}
+			let json = scope String();
+			let options = scope TextureBuildOptions();
+			if ((File.ReadAllText(optionsPath, json) case .Ok) &&
+				(JSON_Beef.Serialization.JSONDeserializer.Deserialize<TextureBuildOptions>(json, options) case .Ok))
+			{
+				srgb = options.Srgb;
+				return true;
+			}
+			Log.Error(scope $"Invalid texture options: {optionsPath}");
+			return false;
+		}
+
 		public override bool OnCheckBuild(StringView path, StringView hash)
 		{
 			var texAtlasPath = scope String()..AppendF("{}{}.json", ResourceManager.runtimeResourcesPath, hash);
 			var texBinaryPath = scope String()..AppendF("{}{}.ktx", ResourceManager.runtimeResourcesPath, hash);
-			var sourceDateTime = SystemUtils.GetLatestTimestamp(path);
+			if (!File.Exists(texBinaryPath) || !File.Exists(texAtlasPath))
+			{
+				return true;
+			}
+			let converterPath = scope String();
+			GetConverterPath(converterPath);
+			var sourceDateTime = SystemUtils.GetLatestTimestamp(path, converterPath);
+			let optionsPath = scope $"{path}.options";
+			if (File.Exists(optionsPath))
+			{
+				sourceDateTime = SystemUtils.GetLatestTimestamp(path, converterPath, optionsPath);
+			}
 			var destinationDateTime = SystemUtils.GetLatestTimestamp(texBinaryPath, texAtlasPath);
-			return sourceDateTime > destinationDateTime;
+			if (sourceDateTime > destinationDateTime)
+			{
+				return true;
+			}
+			let textureFile = scope FileStream();
+			if (!(textureFile.Open(texBinaryPath, .Read) case .Ok))
+			{
+				return true;
+			}
+			if (!(textureFile.Read<KTXHeader>() case .Ok(let header)))
+			{
+				return true;
+			}
+			uint32 expectedMipCount = 1;
+			for (uint32 dimension = Math.Max(header.pixelwidth, header.pixelheight); dimension > 1; dimension >>= 1)
+			{
+				expectedMipCount++;
+			}
+			if (!TryReadSrgbOption(path, let srgb))
+			{
+				return true;
+			}
+			return (header.miplevels != expectedMipCount) || (header.glinternalformat != (srgb ? 0x8C43U : 0x8058U));
 		}
 
 
@@ -251,25 +319,28 @@ namespace GameCore
 			var texAtlasPath = scope String()..AppendF("{}{}.json", ResourceManager.runtimeResourcesPath, hash);
 			var texBinaryPath = scope String()..AppendF("{}{}.ktx", ResourceManager.runtimeResourcesPath, hash);
 			var toolPath = scope String();
-			toolPath.Set(ResourceManager.buildtimeBgfxToolsPath);
-			toolPath.Append("texturecrelease");
+			GetConverterPath(toolPath);
 			SystemUtils.NormalizePath(toolPath);
+			if (!File.Exists(toolPath))
+			{
+				Log.Error(scope $"Texture converter missing: {toolPath}");
+				return false;
+			}
 			var commandLine = scope String();
-			commandLine.Clear();
-			commandLine.AppendF("-f \"{0}\" -o \"{1}\" -t RGBA8 --linear", path, texBinaryPath);
-			// Build terxture
+			if (!TryReadSrgbOption(path, let srgb))
+			{
+				return false;
+			}
+			commandLine.AppendF("-f \"{0}\" -o \"{1}\" -t RGBA8 --mips{2}", path, texBinaryPath, srgb ? "" : " --linear");
 			if (SystemUtils.ExecuteProcess(toolPath, commandLine) != 0)
 			{
-				var temp = scope String();
-				temp.AppendF("{0} texture conversion failed!", path);
-				if (SystemUtils.ShowMessageBoxOKCancel("Texture Conversion", temp) == 1)
-				{
-					System.Environment.Exit(1);
-				}
+				Log.Error(scope $"Texture conversion failed: {path}");
+				return false;
 			}
-			ConvertSpriteAtlas(path, texBinaryPath, texAtlasPath);
+			return File.Exists(texBinaryPath) && ConvertSpriteAtlas(path, texBinaryPath, texAtlasPath);
+#else
+			return false;
 #endif
-			return true;
 		}
 	}
 }

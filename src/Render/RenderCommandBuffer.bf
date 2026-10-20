@@ -123,15 +123,15 @@ public class RenderCommandBuffer
         GPU.DestroyCommandPool(Pool);
     }
 
-    internal void Begin(RenderTexture target, bool swapchain, SwapchainFrame frame)
+    internal void Begin(RenderTexture target, bool swapchain, SwapchainFrame frame, GpuTexture frameOutput = null)
     {
         Target = target;
         swapchainTarget = swapchain;
         colorAttachmentCount = target != null ? target.ColorAttachmentCount : swapchain && frame.render_view != null ? 1 : 0;
         for (int index = 0; index < colorAttachmentCount; ++index)
         {
-            colorAttachments[index] = .() { render_view = target != null ? target.GetColorTexture(index)?.View : frame.render_view };
-            colorTextures[index] = target != null ? target.GetColorTexture(index)?.Texture : null;
+            colorAttachments[index] = .() { render_view = target != null ? target.GetColorTexture(index)?.View : frameOutput != null ? frameOutput.View : frame.render_view };
+            colorTextures[index] = target != null ? target.GetColorTexture(index)?.Texture : frameOutput?.Texture;
             colorFormats[index] = target != null ? target.GetColorFormat(index) : .bgra8_srgb;
         }
         depthView = target != null ? target.DepthHandle?.View : null;
