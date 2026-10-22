@@ -230,7 +230,7 @@ public static class RenderManager
         DeviceDesc description = .();
         description.window = nativeWindow;
         description.swapchain_format = .bgra8_srgb;
-        description.timestamp_query_count = 2;
+        description.timestamp_query_count = 4;
         Device = GPU.CreateDevice(description).device;
         if (Device == null)
             return false;
