@@ -174,7 +174,7 @@ namespace GameCore
 				bool shadersBuilt = false;
 				if (resourceByTypeMap.TryGetValue(typeof(Shader), let shaders))
 					for (var shader in shaders)
-						shadersBuilt |= BuildResource(scope $"{buildtimeResourcesPath}{shader.Name}.slang", false, update);
+						shadersBuilt |= BuildResource(scope $"{buildtimeResourcesPath}{shader.Name}.slang" , false, update);
 				return shadersBuilt;
 			}
 			var wasBuilt = false;
@@ -424,6 +424,17 @@ namespace GameCore
 			return null;
 		}
 
+		public static void GetResourcesByType<T>(List<T> resources, bool load = true) where T : Resource
+		{
+			for (var pair in resourceMap)
+			{
+				if (pair.value is T)
+				{
+					resources.Add(pair.value as T);
+				}
+			}
+		}
+
 		public static T QueueResourceLoad<T>(StringView path) where T : Resource
 		{
 			var hashString = scope String();
@@ -497,7 +508,7 @@ namespace GameCore
 			} else
 			{
 				uint8[] binaryData;
-				result = SystemUtils.ReadBinaryFile(scope $"{ResourceManager.runtimeResourcesPath}/{fileName}", out binaryData);
+				result = SystemUtils.ReadBinaryFile(scope $"{ResourceManager.runtimeResourcesPath}/{fileName}" , out binaryData);
 				if (result)
 				{
 					stream.Position = 0;
