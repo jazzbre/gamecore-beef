@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Threading;
 
 namespace GameCore;
 
@@ -23,6 +24,12 @@ public class SlugFontData
 	private List<SlugFontGlyph> glyphs = new .() ~ delete _;
 	private List<CodepointMapping> codepointMappings = new .() ~ delete _;
 	private List<KerningPair> kerningPairs = new .() ~ delete _;
+	private const int CachedGlyphCount = 256;
+	private int[CachedGlyphCount] cachedGlyphIds;
+	private float[] cachedKerning = new float[CachedGlyphCount * CachedGlyphCount] ~ delete _;
+	private bool lookupCachesValid;
+	private static uint64 nextLayoutId;
+	public uint64 LayoutId { get; private set; }
 	private uint32 fallbackGlyphId;
 	public float Ascent { get; private set; }
 	public float Descent { get; private set; }
@@ -69,6 +76,8 @@ public class SlugFontData
 
 	private bool Fail(StringView message)
 	{
+		LayoutId = 0;
+		lookupCachesValid = false;
 		Error.Set(message);
 		glyphs.Clear();
 		codepointMappings.Clear();
@@ -79,6 +88,8 @@ public class SlugFontData
 
 	public bool Read(Span<uint8> bytes)
 	{
+		LayoutId = 0;
+		lookupCachesValid = false;
 		Error.Clear();
 		glyphs.Clear();
 		codepointMappings.Clear();
@@ -267,7 +278,40 @@ public class SlugFontData
 				return Fail("Invalid Slug curve texel padding");
 			}
 		}
-		return ValidateBandReferences(bytes);
+		if (!ValidateBandReferences(bytes))
+		{
+			return false;
+		}
+		BuildLookupCaches();
+		LayoutId = Interlocked.Increment(ref nextLayoutId);
+		return true;
+	}
+
+	private void BuildLookupCaches()
+	{
+		for (int codepoint = 0; codepoint < CachedGlyphCount; codepoint++)
+		{
+			cachedGlyphIds[codepoint] = (int)fallbackGlyphId;
+		}
+		for (let mapping in codepointMappings)
+		{
+			if (mapping.Codepoint >= CachedGlyphCount)
+			{
+				break;
+			}
+			cachedGlyphIds[mapping.Codepoint] = (int)mapping.GlyphId;
+		}
+		Internal.MemSet(cachedKerning.Ptr, 0, cachedKerning.Count * sizeof(float));
+		for (let pair in kerningPairs)
+		{
+			let leftGlyphId = pair.Key >> 32;
+			let rightGlyphId = (uint32)pair.Key;
+			if (leftGlyphId < CachedGlyphCount && rightGlyphId < CachedGlyphCount)
+			{
+				cachedKerning[(int)leftGlyphId * CachedGlyphCount + rightGlyphId] = pair.Adjustment;
+			}
+		}
+		lookupCachesValid = true;
 	}
 
 	private static bool NearlyEqual(float first, float second)
@@ -328,6 +372,10 @@ public class SlugFontData
 
 	public int FindGlyphId(char32 codepoint)
 	{
+		if (lookupCachesValid && (uint32)codepoint < CachedGlyphCount)
+		{
+			return cachedGlyphIds[(uint32)codepoint];
+		}
 		int minimum = 0;
 		int maximum = codepointMappings.Count;
 		while (minimum < maximum)
@@ -347,6 +395,10 @@ public class SlugFontData
 
 	public float GetKerning(int leftGlyphId, int rightGlyphId)
 	{
+		if (lookupCachesValid && (uint32)leftGlyphId < CachedGlyphCount && (uint32)rightGlyphId < CachedGlyphCount)
+		{
+			return cachedKerning[leftGlyphId * CachedGlyphCount + rightGlyphId];
+		}
 		uint64 key = ((uint64)leftGlyphId << 32) | (uint32)rightGlyphId;
 		int minimum = 0;
 		int maximum = kerningPairs.Count;

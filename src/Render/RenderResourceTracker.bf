@@ -13,18 +13,18 @@ internal struct RenderResourceAccess
     public Access Access;
 }
 
+internal struct RenderResourceKey : IHashable, IEquatable<RenderResourceKey>
+{
+    public void* Resource;
+    public bool IsTexture;
+
+    public int GetHashCode() => ((int)Resource).GetHashCode() ^ (IsTexture ? 397 : 0);
+
+    public bool Equals(RenderResourceKey other) => Resource == other.Resource && IsTexture == other.IsTexture;
+}
+
 internal class RenderResourceTracker
 {
-    private struct ResourceKey : IHashable, IEquatable<ResourceKey>
-    {
-        public void* Resource;
-        public bool IsTexture;
-
-        public int GetHashCode() => ((int)Resource).GetHashCode() ^ (IsTexture ? 397 : 0);
-
-        public bool Equals(ResourceKey other) => Resource == other.Resource && IsTexture == other.IsTexture;
-    }
-
     private struct ResourceState
     {
         public Stage WriteStages;
@@ -36,8 +36,9 @@ internal class RenderResourceTracker
     }
 
     private const Access WriteAccesses = .shader_write | .transfer_write | .color_write | .depth_stencil_write;
-    private Dictionary<ResourceKey, ResourceState> states = new .() ~ delete _;
+    private Dictionary<RenderResourceKey, ResourceState> states = new .() ~ delete _;
     private List<RenderResourceAccess> accesses = new .() ~ delete _;
+    private Dictionary<RenderResourceKey, int> accessIndices = new .() ~ delete _;
     private Stage beforeStages, afterStages;
     private Access beforeAccess, afterAccess;
     private bool externalAccessPending;
@@ -55,6 +56,7 @@ internal class RenderResourceTracker
     {
         states.Clear();
         accesses.Clear();
+        accessIndices.Clear();
         externalAccessPending = false;
         BarrierCount = FallbackBarrierCount = 0;
     }
@@ -62,6 +64,7 @@ internal class RenderResourceTracker
     public void BeginCommand()
     {
         accesses.Clear();
+        accessIndices.Clear();
         beforeStages = afterStages = .none;
         beforeAccess = afterAccess = .none;
         fallbackBarrier = false;
@@ -70,16 +73,18 @@ internal class RenderResourceTracker
     public void Add(RenderResourceAccess access)
     {
         if (access.Resource == null || access.Access == .none)
-            return;
-        for (var existing in ref accesses)
         {
-            if (existing.Resource == access.Resource && existing.IsTexture == access.IsTexture)
-            {
-                existing.Stages |= access.Stages;
-                existing.Access |= access.Access;
-                return;
-            }
+            return;
         }
+        RenderResourceKey key = .() { Resource = access.Resource, IsTexture = access.IsTexture };
+        if (accessIndices.TryGetValue(key, let index))
+        {
+            var existing = ref accesses[index];
+            existing.Stages |= access.Stages;
+            existing.Access |= access.Access;
+            return;
+        }
+        accessIndices.Add(key, accesses.Count);
         accesses.Add(access);
     }
 
@@ -107,7 +112,7 @@ internal class RenderResourceTracker
 
         for (var access in accesses)
         {
-            ResourceKey key = .() { Resource = access.Resource, IsTexture = access.IsTexture };
+            RenderResourceKey key = .() { Resource = access.Resource, IsTexture = access.IsTexture };
             ResourceState previous = default;
             states.TryGetValue(key, out previous);
             bool writes = (access.Access & WriteAccesses) != 0;
@@ -169,13 +174,13 @@ internal class RenderResourceTracker
 
     public void RecordAttachmentWrite(NoGraphicsAPI.Texture* texture, Stage stages, Access access)
     {
-        ResourceKey key = .() { Resource = texture, IsTexture = true };
+        RenderResourceKey key = .() { Resource = texture, IsTexture = true };
         states[key] = .() { WriteStages = stages, WriteAccess = access };
     }
 
     public void Forget(void* resource, bool isTexture)
     {
-        ResourceKey key = .() { Resource = resource, IsTexture = isTexture };
+        RenderResourceKey key = .() { Resource = resource, IsTexture = isTexture };
         states.Remove(key);
     }
 }

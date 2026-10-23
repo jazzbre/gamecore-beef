@@ -44,6 +44,7 @@ public class RenderCommandBuffer
     private RenderResourceTracker resourceTracker = new .(false) ~ delete _;
     private List<RenderResourceAccess> pendingAccesses = new .() ~ delete _;
     internal List<RenderResourceAccess> ResourceSummary = new .() ~ delete _;
+    private Dictionary<RenderResourceKey, int> resourceSummaryIndices = new .() ~ delete _;
     internal CommandBuffer* NativeCommands;
     internal Vector4 FrameShaderData;
     internal Vector4[9] FrameSphericalHarmonics;
@@ -197,16 +198,18 @@ public class RenderCommandBuffer
     private void Summarize(RenderResourceAccess access)
     {
         if (access.Resource == null)
-            return;
-        for (var existing in ref ResourceSummary)
         {
-            if (existing.Resource == access.Resource && existing.IsTexture == access.IsTexture)
-            {
-                existing.Stages |= access.Stages;
-                existing.Access |= access.Access;
-                return;
-            }
+            return;
         }
+        RenderResourceKey key = .() { Resource = access.Resource, IsTexture = access.IsTexture };
+        if (resourceSummaryIndices.TryGetValue(key, let index))
+        {
+            var existing = ref ResourceSummary[index];
+            existing.Stages |= access.Stages;
+            existing.Access |= access.Access;
+            return;
+        }
+        resourceSummaryIndices.Add(key, ResourceSummary.Count);
         ResourceSummary.Add(access);
     }
 
@@ -587,6 +590,7 @@ public class RenderCommandBuffer
         resourceTracker.Reset();
         pendingAccesses.Clear();
         ResourceSummary.Clear();
+        resourceSummaryIndices.Clear();
         UploadMemory = null;
         temporaryBufferIndex = 0;
         directBarrierCount = 0;
