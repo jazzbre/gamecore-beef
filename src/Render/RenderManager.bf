@@ -52,6 +52,14 @@ public static class RenderManager
         public uint64 ReadbackWaitCount;
         public uint64 ExplicitWaitCount;
         public double CpuWaitMilliseconds;
+        public double FrameWaitMilliseconds;
+        public double UploadWaitMilliseconds;
+        public double ReadbackWaitMilliseconds;
+        public double ExplicitWaitMilliseconds;
+        public double FrameCleanupMilliseconds;
+        public double AcquireMilliseconds;
+        public double TextureResizeMilliseconds;
+        public uint64 TextureResizeCount;
         public uint64 UploadSubmissionCount;
         public uint64 UploadBytes;
         public uint64 BarrierCount;
@@ -425,17 +433,22 @@ public static class RenderManager
         timer.Start();
         GPU.WaitTimeline(point);
         timer.Stop();
-        Synchronization.CpuWaitMilliseconds += timer.Elapsed.TotalMilliseconds;
+        let milliseconds = timer.Elapsed.TotalMilliseconds;
+        Synchronization.CpuWaitMilliseconds += milliseconds;
         switch (reason)
         {
         case .FrameReuse:
             ++Synchronization.FrameWaitCount;
+            Synchronization.FrameWaitMilliseconds += milliseconds;
         case .UploadReuse:
             ++Synchronization.UploadWaitCount;
+            Synchronization.UploadWaitMilliseconds += milliseconds;
         case .Readback:
             ++Synchronization.ReadbackWaitCount;
+            Synchronization.ReadbackWaitMilliseconds += milliseconds;
         case .Explicit:
             ++Synchronization.ExplicitWaitCount;
+            Synchronization.ExplicitWaitMilliseconds += milliseconds;
         }
     }
 
@@ -489,6 +502,11 @@ public static class RenderManager
         if (frame.Completion.value == 0)
             return;
         WaitForCompletion(frame.Completion, reason);
+        var cleanupTimer = scope Stopwatch();
+        if (ProfilingEnabled)
+        {
+            cleanupTimer.Start();
+        }
         uint64* frameTicks = (.)frame.Timestamps.range.cpu;
         HasGpuTiming = frame.RecordedTimings && frameTicks[1] >= frameTicks[0];
         GpuMilliseconds = HasGpuTiming ? (frameTicks[1] - frameTicks[0]) * GPU.GetDeviceCaps(Device).timestamp_period_ns / 1000000.0f : 0;
@@ -518,6 +536,10 @@ public static class RenderManager
             workerMemory.Reset();
         GPU.ResetCommandPool(frame.Pool);
         frame.Completion = default;
+        if (ProfilingEnabled)
+        {
+            Synchronization.FrameCleanupMilliseconds += cleanupTimer.Elapsed.TotalMilliseconds;
+        }
     }
 
     private static void PrepareFrame()
@@ -531,7 +553,16 @@ public static class RenderManager
             && GPU.GetDeviceCaps(Device).timestamp_period_ns > 0;
         if (frameResources.RecordedTimings)
             GPU.WriteTimestamp(commands, (.)frameResources.Timestamps.range.gpu, .all_commands);
+        var acquireTimer = scope Stopwatch();
+        if (ProfilingEnabled)
+        {
+            acquireTimer.Start();
+        }
         SwapchainFrame frame = hasSwapchain ? GPU.Acquire(commands) : default;
+        if (ProfilingEnabled)
+        {
+            Synchronization.AcquireMilliseconds += acquireTimer.Elapsed.TotalMilliseconds;
+        }
         if (pendingFrameCapture != null && frame.render_view != null && frame.extent.x > 0 && frame.extent.y > 0)
         {
             activeFrameCapture = pendingFrameCapture;

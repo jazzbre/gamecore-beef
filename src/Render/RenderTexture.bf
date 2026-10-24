@@ -1,5 +1,6 @@
 using internal GameCore;
 using System;
+using System.Diagnostics;
 using NoGraphicsAPI;
 
 namespace GameCore;
@@ -67,7 +68,22 @@ public class RenderTexture
     public void Resize(int width, int height)
     {
         if (Width == width && Height == height)
+        {
             return;
+        }
+        var resizeTimer = scope Stopwatch();
+        if (RenderManager.ProfilingEnabled)
+        {
+            resizeTimer.Start();
+        }
+        defer
+        {
+            if (RenderManager.ProfilingEnabled)
+            {
+                RenderManager.Synchronization.TextureResizeMilliseconds += resizeTimer.Elapsed.TotalMilliseconds;
+                ++RenderManager.Synchronization.TextureResizeCount;
+            }
+        }
         for (var texture in colorTextures)
             delete texture;
         delete DepthHandle;
