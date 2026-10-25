@@ -16,6 +16,10 @@ namespace GameCore
 		public static var masterVolume = 1.0f;
 		public static var musicMasterVolume = 1.0f;
 		public static var musicFadeVolume = 1.0f;
+		public static var effectsMasterVolume = 1.0f;
+		private static Bus effectsBus = new .() ~ delete _;
+		private static uint32 effectsBusHandle;
+		private static bool initialized;
 
 		static int activeMusicIndex = 0;
 		static float activeMusicFactor = 0.0f;
@@ -35,17 +39,27 @@ namespace GameCore
 				return false;
 			}
 
+			initialized = true;
+			EnsureEffectsBus();
+			SetVolumes(masterVolume, musicMasterVolume, effectsMasterVolume);
 			return true;
 		}
 
 		public static void Finalize()
 		{
+			initialized = false;
+			effectsBusHandle = 0;
 			// Finalize SoLoud
 			soloud.deinit();
 		}
 
 		public static void OnUpdate(float deltaTime)
 		{
+			if (!initialized)
+			{
+				return;
+			}
+			SoLoud.setGlobalVolume(masterVolume);
 			activeMusicFactor = Math.MoveTowards(activeMusicFactor, (float)activeMusicIndex, deltaTime * 0.5f);
 			for (var i = 0; i < 2; ++i)
 			{
@@ -54,13 +68,39 @@ namespace GameCore
 					continue;
 				}
 				var volume = i == 0 ? 1.0f - activeMusicFactor : activeMusicFactor;
-				SoLoud.setVolume(activeMusicHandles[i], volume * masterVolume * musicMasterVolume * musicFadeVolume);
+				SoLoud.setVolume(activeMusicHandles[i], volume * musicMasterVolume * musicFadeVolume);
 				if (volume <= 0.0001f && i != activeMusicIndex)
 				{
 					SoLoud.stop(activeMusicHandles[i]);
 					activeMusicHandles[i] = 0;
 				}
 			}
+		}
+
+		private static void EnsureEffectsBus()
+		{
+			if (SoLoud.isValidVoiceHandle(effectsBusHandle) != 0)
+			{
+				return;
+			}
+			effectsBusHandle = SoLoud.play(effectsBus, effectsMasterVolume);
+			SoLoud.setProtectVoice(effectsBusHandle, 1);
+			SoLoud.setInaudibleBehavior(effectsBusHandle, 1, 0);
+		}
+
+		public static void SetVolumes(float master, float music, float effects)
+		{
+			masterVolume = master.IsFinite ? Math.Clamp(master, 0.0f, 1.0f) : 1.0f;
+			musicMasterVolume = music.IsFinite ? Math.Clamp(music, 0.0f, 1.0f) : 1.0f;
+			effectsMasterVolume = effects.IsFinite ? Math.Clamp(effects, 0.0f, 1.0f) : 1.0f;
+			if (!initialized)
+			{
+				return;
+			}
+			EnsureEffectsBus();
+			SoLoud.setGlobalVolume(masterVolume);
+			SoLoud.setVolume(effectsBusHandle, effectsMasterVolume);
+			OnUpdate(0.0f);
 		}
 
 		public static uint32 Play(StringView name, float volume = 1.0f, float pan = 0.0f, AudioBus bus = .Default)
@@ -75,7 +115,9 @@ namespace GameCore
 			{
 				return 0;
 			}
-			var handle = SoLoud.play(audioClip.Clip, volume * masterVolume, pan);
+			SoLoud.setGlobalVolume(masterVolume);
+			EnsureEffectsBus();
+			var handle = effectsBus.play(audioClip.Clip, volume, pan);
 			return handle;
 		}
 
@@ -132,6 +174,7 @@ namespace GameCore
 		{
 			PlayMusic(null);
 			SoLoud.stopAll();
+			effectsBusHandle = 0;
 		}
 	}
 }
