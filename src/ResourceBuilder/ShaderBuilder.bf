@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.IO;
+using System.Threading;
 using JSON_Beef.Serialization;
 using JSON_Beef.Types;
 
@@ -15,9 +16,15 @@ public class ShaderBuilder : ResourceBuilder
     private HashSet<String> visitedDependencies = new .() ~ DeleteContainerAndItems!(_);
     private HashSet<String> variantNames = new .() ~ delete _;
     private List<String> variantDefines = new .() ~ delete _;
-    private List<uint8> stageBytecode = new .() ~ delete _;
+    private List<ShaderStageCompilation> stageCompilations = new .() ~ DeleteContainerAndItems!(_);
+    private List<Thread> compileWorkers = new .() ~ DeleteContainerAndItems!(_);
+    private String compilationSource = new .() ~ delete _;
+    private ShaderCompiler activeCompiler;
+    private int activeStageCount;
+    private int nextStageIndex;
     private List<uint8> packageBytes = new .() ~ delete _;
     public String Error = new .() ~ delete _;
+    public int MaximumConcurrentCompilations = 4;
     public override String[] Extensions => ExtensionsStrings;
     public override Type ResourceType => typeof(Shader);
 
@@ -172,7 +179,74 @@ public class ShaderBuilder : ResourceBuilder
         return true;
     }
 
-    private bool CompileVariant(StringView source, JSONObject variant, ShaderCompiler compiler, DynMemStream package)
+    private void PrepareStage(StringView variantName, StringView entryPoint, ShaderStage stage)
+    {
+        if (activeStageCount == stageCompilations.Count)
+        {
+            stageCompilations.Add(new .());
+        }
+        let compilation = stageCompilations[activeStageCount++];
+        compilation.VariantName.Set(variantName);
+        compilation.EntryPoint.Set(entryPoint);
+        compilation.Stage = stage;
+        compilation.Succeeded = false;
+        compilation.Error.Clear();
+        compilation.Bytecode.Clear();
+        compilation.Defines.Clear();
+        for (let define in variantDefines)
+        {
+            compilation.Defines.Add(define);
+        }
+    }
+
+    private void CompilePendingStages()
+    {
+        while (true)
+        {
+            let stageIndex = Interlocked.Increment(ref nextStageIndex) - 1;
+            if (stageIndex >= activeStageCount)
+            {
+                return;
+            }
+            let compilation = stageCompilations[stageIndex];
+            compilation.Succeeded = activeCompiler.CompileStage(compilationSource, compilation.EntryPoint, compilation.Stage,
+                compilation.Defines, includeDirectories, compilation.Bytecode, compilation.Error);
+        }
+    }
+
+    private bool CompilePreparedStages(StringView source, ShaderCompiler compiler)
+    {
+        compilationSource.Set(source);
+        activeCompiler = compiler;
+        nextStageIndex = 0;
+        let workerCount = compiler.SupportsParallelCompilation ? Math.Min(Math.Max(MaximumConcurrentCompilations, 1), activeStageCount) : 1;
+        for (int workerIndex = 1; workerIndex < workerCount; workerIndex++)
+        {
+            let worker = new Thread(new => CompilePendingStages);
+            compileWorkers.Add(worker);
+            worker.Start(false);
+        }
+        CompilePendingStages();
+        for (let worker in compileWorkers)
+        {
+            worker.Join();
+            delete worker;
+        }
+        compileWorkers.Clear();
+        activeCompiler = null;
+        for (int stageIndex = 0; stageIndex < activeStageCount; stageIndex++)
+        {
+            let compilation = stageCompilations[stageIndex];
+            if (!compilation.Succeeded)
+            {
+                Error.Set(scope $"{compilation.VariantName} ({compilation.Stage}): {compilation.Error}");
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private bool PrepareVariant(JSONObject variant)
     {
         String name = "Default";
         variantDefines.Clear();
@@ -208,8 +282,6 @@ public class ShaderBuilder : ResourceBuilder
             Error.Set(scope $"Duplicate shader variant: {name}");
             return false;
         }
-        package.Write<int32>((.)name.Length);
-        package.TryWrite(.((uint8*)name.Ptr, name.Length));
         if (variant != null && variant.ContainsKey("compute"))
         {
             if (variant.ContainsKey("vertex") || variant.ContainsKey("fragment"))
@@ -218,32 +290,29 @@ public class ShaderBuilder : ResourceBuilder
                 return false;
             }
             if (!GetEntryPoint(variant, "compute", "computeMain", let computeEntry))
+            {
                 return false;
-            if (!compiler.CompileStage(source, computeEntry, .Compute,
-                variantDefines, includeDirectories, stageBytecode, Error)) return false;
-            package.Write<int32>(0);
-            package.Write<int32>((.)stageBytecode.Count);
-            package.TryWrite(stageBytecode);
+            }
+            PrepareStage(name, computeEntry, .Compute);
             return true;
         }
         if (!GetEntryPoint(variant, "vertex", "vertexMain", let vertexEntry))
-            return false;
-        if (!GetEntryPoint(variant, "fragment", "fragmentMain", let fragmentEntry))
-            return false;
-        for (int stageIndex = 0; stageIndex < 2; ++stageIndex)
         {
-            ShaderStage stage = stageIndex == 0 ? .Vertex : .Fragment;
-            if (!compiler.CompileStage(source, stage == .Vertex ? vertexEntry : fragmentEntry, stage,
-                variantDefines, includeDirectories, stageBytecode, Error)) return false;
-            package.Write<int32>((.)stageBytecode.Count);
-            package.TryWrite(stageBytecode);
+            return false;
         }
+        if (!GetEntryPoint(variant, "fragment", "fragmentMain", let fragmentEntry))
+        {
+            return false;
+        }
+        PrepareStage(name, vertexEntry, .Vertex);
+        PrepareStage(name, fragmentEntry, .Fragment);
         return true;
     }
 
     public bool BuildFile(StringView source, StringView output, StringView platformIncludeDirectory, ShaderCompiler compiler = null)
     {
         Error.Clear();
+        activeStageCount = 0;
         if (!source.EndsWith(".slang"))
         {
             Error.Set("Shader sources must be native .slang files");
@@ -280,7 +349,6 @@ public class ShaderBuilder : ResourceBuilder
             }
         }
         int count = variants == null ? 1 : variants.Count;
-        package.Write<int32>((.)count);
         for (int index = 0; index < count; ++index)
         {
             JSONObject variant = null;
@@ -289,8 +357,30 @@ public class ShaderBuilder : ResourceBuilder
                 Error.Set("Shader variant must be an object");
                 return false;
             }
-            if (!CompileVariant(source, variant, selectedCompiler, package))
+            if (!PrepareVariant(variant))
+            {
                 return false;
+            }
+        }
+        if (!CompilePreparedStages(source, selectedCompiler))
+        {
+            return false;
+        }
+        package.Write<int32>((.)count);
+        for (int stageIndex = 0; stageIndex < activeStageCount; stageIndex++)
+        {
+            let compilation = stageCompilations[stageIndex];
+            if (compilation.Stage != .Fragment)
+            {
+                package.Write<int32>((.)compilation.VariantName.Length);
+                package.TryWrite(.((uint8*)compilation.VariantName.Ptr, compilation.VariantName.Length));
+            }
+            if (compilation.Stage == .Compute)
+            {
+                package.Write<int32>(0);
+            }
+            package.Write<int32>((.)compilation.Bytecode.Count);
+            package.TryWrite(compilation.Bytecode);
         }
         var outputDirectory = scope String();
         Path.GetDirectoryPath(output, outputDirectory);

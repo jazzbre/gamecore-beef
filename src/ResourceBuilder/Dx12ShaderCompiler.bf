@@ -7,6 +7,7 @@ namespace GameCore;
 public class Dx12ShaderCompiler : ShaderCompiler
 {
     public override StringView OutputExtension => ".Direct3D12.shader";
+    public override bool SupportsParallelCompilation => true;
 
     public override bool CompileStage(StringView source, StringView entryPoint, ShaderStage stage,
         List<String> defines, List<String> includeDirectories, List<uint8> bytecode, String error)
@@ -18,12 +19,13 @@ public class Dx12ShaderCompiler : ShaderCompiler
             error.Set(scope $"Slang compiler missing: {compilerPath}");
             return false;
         }
-        var temporaryPath = scope String();
-        if (Path.GetTempFileName(temporaryPath) case .Err || temporaryPath.IsEmpty)
+        let temporaryDirectory = ".temp/shader-compilation";
+        if (Directory.CreateDirectory(temporaryDirectory) case .Err)
         {
-            error.Set("Cannot create temporary shader file");
+            error.Set("Cannot create temporary shader directory");
             return false;
         }
+        let temporaryPath = scope $"{temporaryDirectory}/{Guid.Create()}.dxil";
         defer File.Delete(temporaryPath);
         var arguments = scope String();
         AppendArgument(arguments, source);

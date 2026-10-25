@@ -13,6 +13,7 @@ public enum ShaderStage
 public abstract class ShaderCompiler
 {
     public abstract StringView OutputExtension { get; }
+    public virtual bool SupportsParallelCompilation => false;
 
     public abstract bool CompileStage(StringView source, StringView entryPoint, ShaderStage stage,
         List<String> defines, List<String> includeDirectories, List<uint8> bytecode, String error);
