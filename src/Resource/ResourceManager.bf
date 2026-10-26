@@ -418,7 +418,10 @@ namespace GameCore
 				{
 					return null;
 				}
-				resource.Load();
+				if (load)
+				{
+					resource.Load();
+				}
 				return resource as T;
 			}
 			return null;
@@ -491,6 +494,23 @@ namespace GameCore
 			var stream = Internal.UnsafeCastToObject(userData) as DynMemStream;
 			stream.TryWrite(Span<uint8>((uint8*)buffer, (int)count));
 			return count;
+		}
+
+		/// Uncompressed size in bytes, or -1 when the file is missing.
+		public static int64 GetFileSize(StringView fileName)
+		{
+			if (zipArchive != null)
+			{
+				let index = zipArchive.FindFile(scope $"{fileName}\0");
+				let fileInfo = scope ZipArchiveFileInfo();
+				return ((index != -1) && zipArchive.GetFileInfo(index, fileInfo)) ? (int64)fileInfo.uncompressedSize : -1;
+			}
+			let stream = scope FileStream();
+			if (stream.Open(scope $"{ResourceManager.runtimeResourcesPath}/{fileName}", .Read) case .Err)
+			{
+				return -1;
+			}
+			return stream.Length;
 		}
 
 		public static bool ReadFile(StringView fileName, DynMemStream stream)

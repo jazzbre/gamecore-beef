@@ -18,6 +18,11 @@ public class GpuTexture
     private Dictionary<uint64, uint32> subresourceDescriptors = new .() ~ delete _;
     public uint32 Descriptor;
     private ImGui.TextureID imageId;
+    private GpuTextureHeapPool heapPool;
+    private uint64 heapOffset;
+    private uint64 heapSize;
+    /// False when the texture was placed in pooled memory an earlier texture used, so texels it never writes are undefined.
+    public bool IsZeroed { get; private set; } = true;
 
     public ImGui.TextureID ImageId
     {
@@ -29,7 +34,7 @@ public class GpuTexture
         }
     }
 
-    public this(uint32 width, uint32 height, Format format, TextureUsage usage, void* pixels = null, uint32 pixelBytes = 0, uint32 mipLevels = 1, TextureType type = .two_d, uint32 depth = 1, uint32 layerCount = 0)
+    public this(uint32 width, uint32 height, Format format, TextureUsage usage, void* pixels = null, uint32 pixelBytes = 0, uint32 mipLevels = 1, TextureType type = .two_d, uint32 depth = 1, uint32 layerCount = 0, GpuTextureHeapPool pool = null)
     {
         RenderManager.ResourceLock.Enter();
         defer RenderManager.ResourceLock.Exit();
@@ -48,11 +53,24 @@ public class GpuTexture
         description.format = format;
         description.mip_levels = mipLevels;
         description.usage = usage | .sampled | .transfer_source | .transfer_destination;
-        Memory = GPU.CreateTextureHeap(RenderManager.Device, GPU.GetTextureSizeAlign(RenderManager.Device, description).size);
+        let sizeAlign = GPU.GetTextureSizeAlign(RenderManager.Device, description);
+        if (pool != null)
+        {
+            let allocation = pool.Allocate(sizeAlign.size, sizeAlign.@align);
+            Memory = allocation.Heap;
+            heapPool = pool;
+            heapOffset = allocation.Offset;
+            heapSize = allocation.Size;
+            IsZeroed = allocation.IsZeroed;
+        }
+        else
+        {
+            Memory = GPU.CreateTextureHeap(RenderManager.Device, sizeAlign.size);
+        }
         if (Memory.owner == null)
             Runtime.FatalError("Unable to allocate NGA texture memory");
         var commands = RenderManager.BeginUpload();
-        Texture = GPU.CreateTexture(commands, description, Memory, 0);
+        Texture = GPU.CreateTexture(commands, description, Memory, heapOffset);
         if (pixels != null && Texture != null)
         {
             var upload = RenderManager.AllocateUpload(pixelBytes);
@@ -149,6 +167,6 @@ public class GpuTexture
     {
         for (var entry in subresourceDescriptors)
             RenderManager.RetireTextureDescriptor(entry.value);
-        RenderManager.RetireTexture(Texture, Memory, View, Descriptor, imageId);
+        RenderManager.RetireTexture(Texture, Memory, View, Descriptor, imageId, heapPool, heapOffset, heapSize);
     }
 }

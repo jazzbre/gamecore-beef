@@ -33,11 +33,16 @@ public static class RenderManager
         public RenderView* View;
         public uint32 Descriptor;
         public ImGui.TextureID Image;
+        public GpuTextureHeapPool HeapPool;
+        public uint64 HeapOffset;
+        public uint64 HeapSize;
     }
 
     public static uint32 TextureDescriptorCapacity { get; private set; }
     private const uint32 ImGuiTextureCapacity = 256;
     public static readonly Monitor ResourceLock = new .() ~ delete _;
+    /// Shared placement for textures created in large numbers; lives as long as the device.
+    public static GpuTextureHeapPool TextureHeapPool { get; private set; }
     public static Device* Device;
     public static uint64 CompletedFrame { get; private set; }
     private static UploadBatch[] uploadBatches = new UploadBatch[FramesInFlight] ~ DeleteContainerAndItems!(_);
@@ -243,6 +248,7 @@ public static class RenderManager
         if (Device == null)
             return false;
         TextureDescriptorCapacity = textureDescriptorCapacity;
+        TextureHeapPool = new .();
         hasSwapchain = nativeWindow != null;
         var capabilities = GPU.GetDeviceCaps(Device);
         TextureDescriptors = GPU.CreateGpuHeap(Device, capabilities.texture_descriptor_size * (TextureDescriptorCapacity + ImGuiTextureCapacity), .texture_descriptor_heap);
@@ -296,6 +302,7 @@ public static class RenderManager
         delete whiteTexture;
         whiteTexture = null;
         CollectResources(retiredBuffers, retiredTextures, retiredDescriptors);
+        DeleteAndNullify!(TextureHeapPool);
         for (var buffer in commandBuffers)
             delete buffer;
         commandBuffers.Clear();
@@ -387,11 +394,12 @@ public static class RenderManager
         retiredBuffers.Add(memory);
     }
 
-    public static void RetireTexture(NoGraphicsAPI.Texture* texture, TextureHeap memory, RenderView* view, uint32 descriptor, ImGui.TextureID image)
+    public static void RetireTexture(NoGraphicsAPI.Texture* texture, TextureHeap memory, RenderView* view, uint32 descriptor, ImGui.TextureID image,
+        GpuTextureHeapPool heapPool = null, uint64 heapOffset = 0, uint64 heapSize = 0)
     {
         ResourceLock.Enter();
         defer ResourceLock.Exit();
-        retiredTextures.Add(.() { Texture = texture, Memory = memory, View = view, Descriptor = descriptor, Image = image });
+        retiredTextures.Add(.() { Texture = texture, Memory = memory, View = view, Descriptor = descriptor, Image = image, HeapPool = heapPool, HeapOffset = heapOffset, HeapSize = heapSize });
     }
 
     public static void RetireTextureDescriptor(uint32 descriptor)
@@ -416,7 +424,14 @@ public static class RenderManager
             ResourceTracker?.Forget(texture.Texture, true);
             GPU.DestroyRenderView(texture.View);
             GPU.DestroyTexture(texture.Texture);
-            GPU.DestroyTextureHeap(texture.Memory);
+            if (texture.HeapPool != null)
+            {
+                texture.HeapPool.Free(texture.Memory, texture.HeapOffset, texture.HeapSize);
+            }
+            else
+            {
+                GPU.DestroyTextureHeap(texture.Memory);
+            }
             freeDescriptors.Add(texture.Descriptor);
         }
         retiredTextures.Clear();
