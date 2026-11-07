@@ -17,11 +17,11 @@ namespace GameCore
 		{
 #if RESOURCEBUILD
 			var oggBinaryPath = scope String()..AppendF("{}{}.ogg", ResourceManager.runtimeResourcesPath, hash);
-			/*
-			if( path.Contains("_loop")) {
-				SystemUtils.FileCopy(path, oggBinaryPath);
-				return true;
-			}*/
+			if (path.EndsWith(".wav"))
+			{
+				// The resource suffix is fixed; SoLoud detects the format from the file header.
+				return SystemUtils.FileCopy(path, oggBinaryPath, true);
+			}
 			// Build
 			var toolPath = scope String();
 			toolPath.Set(ResourceManager.buildtimeToolsPath);
@@ -46,6 +46,19 @@ namespace GameCore
 			var oggBinaryPath = scope String()..AppendF("{}{}.ogg", ResourceManager.runtimeResourcesPath, hash);
 			var sourceDateTime = SystemUtils.GetLatestTimestamp(path);
 			var destinationDateTime = SystemUtils.GetLatestTimestamp(oggBinaryPath);
+			if (path.EndsWith(".wav"))
+			{
+				let source = scope FileStream();
+				let destination = scope FileStream();
+				if (source.Open(path, .Read) case .Err || destination.Open(oggBinaryPath, .Read) case .Err)
+				{
+					return true;
+				}
+				if (source.Length != destination.Length)
+				{
+					return true;
+				}
+			}
 			return sourceDateTime > destinationDateTime;
 		}
 	}

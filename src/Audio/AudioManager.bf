@@ -29,6 +29,19 @@ namespace GameCore
 		public static delegate float(Vector2 position) OnGetDistanceCallback = null ~ delete _;
 
 		public static Soloud SoLoud => soloud;
+		public static bool IsInitialized => initialized;
+		public static uint32 EffectsBusHandle
+		{
+			get
+			{
+				if (!initialized)
+				{
+					return 0;
+				}
+				EnsureEffectsBus();
+				return effectsBusHandle;
+			}
+		}
 
 		public static bool Initialize()
 		{
@@ -49,6 +62,7 @@ namespace GameCore
 		{
 			initialized = false;
 			effectsBusHandle = 0;
+			DeleteAndNullify!(effectsBus);
 			// Finalize SoLoud
 			soloud.deinit();
 		}
@@ -83,6 +97,7 @@ namespace GameCore
 			{
 				return;
 			}
+			effectsBus ??= new .();
 			effectsBusHandle = SoLoud.play(effectsBus, effectsMasterVolume);
 			SoLoud.setProtectVoice(effectsBusHandle, 1);
 			SoLoud.setInaudibleBehavior(effectsBusHandle, 1, 0);
@@ -115,10 +130,18 @@ namespace GameCore
 			{
 				return 0;
 			}
+			return Play(audioClip.Clip, volume, pan, bus);
+		}
+
+		public static uint32 Play(SoloudObject soundSource, float volume = 1.0f, float pan = 0.0f, AudioBus bus = .Default)
+		{
+			if (!initialized || soundSource == null)
+			{
+				return 0;
+			}
 			SoLoud.setGlobalVolume(masterVolume);
 			EnsureEffectsBus();
-			var handle = effectsBus.play(audioClip.Clip, volume, pan);
-			return handle;
+			return effectsBus.play(soundSource, volume, pan);
 		}
 
 		public static uint32 PlayAtPosition(StringView name, Vector2 position, float volume = 1.0f, float range = 300.0f, AudioBus bus = .Default)
