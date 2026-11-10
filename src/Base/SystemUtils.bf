@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Diagnostics;
 using System.Collections;
+using System.Threading;
 using SDL2;
 
 namespace GameCore
@@ -51,64 +52,83 @@ namespace GameCore
 			processStartInfo.SetFileName(executable);
 			processStartInfo.SetArguments(commandLine);
 #if BF_PLATFORM_WINDOWS
+			processStartInfo.CreateNoWindow = true;
+			processStartInfo.RedirectStandardOutput = true;
+			processStartInfo.RedirectStandardError = true;
 			var outputStream = scope FileStream();
-			if (output != null)
-			{
-				processStartInfo.RedirectStandardError = true;
-			}
 			var errorOutputStream = scope FileStream();
-			if (errorOutput != null)
-			{
-				processStartInfo.RedirectStandardOutput = true;
-			}
 #endif
 			switch (process.Start(processStartInfo)) {
 			case .Ok:
 #if BF_PLATFORM_WINDOWS
-				if (output != null)
-				{
-					process.AttachStandardOutput(outputStream);
-				}
-				if (errorOutput != null)
-				{
-					process.AttachStandardError(errorOutputStream);
-				}
+				process.AttachStandardOutput(outputStream);
+				process.AttachStandardError(errorOutputStream);
 #endif
 				break;
 			case .Err:
 				return -1;
 			}
+
+#if BF_PLATFORM_WINDOWS
+			var capturedStandardOutput = scope String();
+			var capturedStandardError = scope String();
+			var outputReader = scope Thread(new () => ReadProcessOutput(outputStream, capturedStandardOutput));
+			var errorReader = scope Thread(new () => ReadProcessOutput(errorOutputStream, capturedStandardError));
+			// Both pipes must drain before waiting, otherwise a verbose tool can block on a full pipe.
+			outputReader.Start(false);
+			errorReader.Start(false);
+#endif
 			process.WaitFor();
-#if BF_PLATFORM_WINDOWS			
+#if BF_PLATFORM_WINDOWS
+			outputReader.Join();
+			errorReader.Join();
 			if (output != null)
 			{
-				if (outputStream.Length > 0)
-				{
-					var outputData = scope char8[outputStream.Length];
-					outputStream.Position = 0;
-					outputStream.TryRead(Span<uint8>((uint8*)&outputData[0], outputData.Count));
-					output.Set(StringView(outputData, 0, outputData.Count));
-				} else
-				{
-					output.Clear();
-				}
+				output.Set(capturedStandardOutput);
+			}
+			else if (!capturedStandardOutput.IsEmpty)
+			{
+				Log.Info("{}", capturedStandardOutput);
 			}
 			if (errorOutput != null)
 			{
-				if (errorOutputStream.Length > 0)
+				errorOutput.Set(capturedStandardError);
+			}
+			else if (!capturedStandardError.IsEmpty)
+			{
+				if (process.ExitCode == 0)
 				{
-					var outputData = scope char8[errorOutputStream.Length];
-					errorOutputStream.Position = 0;
-					errorOutputStream.TryRead(Span<uint8>((uint8*)&outputData[0], outputData.Count));
-					errorOutput.Set(StringView(outputData, 0, outputData.Count));
-				} else
+					Log.Warning("{}", capturedStandardError);
+				}
+				else
 				{
-					errorOutput.Clear();
+					Log.Error("{}", capturedStandardError);
 				}
 			}
 #endif
 			return process.ExitCode;
 		}
+
+#if BF_PLATFORM_WINDOWS
+		private static void ReadProcessOutput(FileStream stream, String output)
+		{
+			var buffer = scope uint8[4096];
+			while (true)
+			{
+				switch (stream.TryRead(Span<uint8>(buffer)))
+				{
+				case .Ok(let readCount):
+					if (readCount == 0)
+					{
+						return;
+					}
+					output.Append(StringView((char8*)&buffer[0], readCount));
+				case .Err:
+					return;
+				}
+			}
+		}
+#endif
 
 		public static bool ReadBinaryFile(StringView filename, out uint8[] data)
 		{

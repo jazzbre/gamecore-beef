@@ -43,7 +43,6 @@ public class Dx12ShaderCompiler : ShaderCompiler
         {
             AppendArgument(arguments, scope $"-D{define}");
         }
-        // Inherit compiler output so diagnostics cannot fill an unread redirected pipe.
         if (SystemUtils.ExecuteProcess(compilerPath, arguments) != 0)
         {
             error.Set(scope $"Slang failed for {source}, {entryPoint} ({stage})");
