@@ -17,9 +17,12 @@ public class RenderTexture
     public GpuTexture DepthHandle { get; private set; }
     public Format ColorFormat => ColorAttachmentCount > 0 ? colorFormats[0] : .undefined;
     public Format DepthFormat { get; private set; }
+    private TextureUsage firstColorExtraUsage;
 
-    public this(int width, int height, Format colorFormat = .rgba8_unorm, Format depthFormat = .undefined)
+    /// firstColorExtraUsage is added to the first color attachment, for example .storage so compute passes can write it.
+    public this(int width, int height, Format colorFormat = .rgba8_unorm, Format depthFormat = .undefined, TextureUsage firstColorExtraUsage = .none)
     {
+        this.firstColorExtraUsage = firstColorExtraUsage;
         if (colorFormat != .undefined)
         {
             ColorAttachmentCount = 1;
@@ -29,8 +32,9 @@ public class RenderTexture
         Resize(width, height);
     }
 
-    public this(int width, int height, Span<Format> colorFormats, Format depthFormat = .undefined)
+    public this(int width, int height, Span<Format> colorFormats, Format depthFormat = .undefined, TextureUsage firstColorExtraUsage = .none)
     {
+        this.firstColorExtraUsage = firstColorExtraUsage;
         if (colorFormats.Length > MaxColorAttachments)
             Runtime.FatalError("Too many color attachments");
         ColorAttachmentCount = colorFormats.Length;
@@ -94,7 +98,7 @@ public class RenderTexture
         if (width <= 0 || height <= 0)
             return;
         for (int index = 0; index < ColorAttachmentCount; ++index)
-            colorTextures[index] = new .((.)width, (.)height, colorFormats[index], .color_attachment);
+            colorTextures[index] = new .((.)width, (.)height, colorFormats[index], index == 0 ? .color_attachment | firstColorExtraUsage : .color_attachment);
         if (DepthFormat != .undefined)
             DepthHandle = new .((.)width, (.)height, DepthFormat, .depth_stencil_attachment);
         RenderManager.ResourceLock.Enter();
